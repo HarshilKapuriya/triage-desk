@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 from app.db import lifespan
 from app.routers.auth import router as auth_router
+from app.routers.api_keys import router as api_keys_router
+from app.routers.tickets import router as tickets_router
 
 app = FastAPI(
     title="Ticket Intelligence Platform API",
@@ -45,7 +47,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     errors = exc.errors()
     if errors:
         first = errors[0]
-        field_path = " -> ".join(str(loc) for loc in first.get("loc", []) if loc != "body")
+        locs = list(first.get("loc", []))
+        if locs and locs[0] in ("body", "query", "path", "header"):
+            locs = locs[1:]
+        field_path = " -> ".join(str(loc) for loc in locs)
         msg = first.get("msg", "Invalid input.")
         message = f"Validation error for '{field_path}': {msg}" if field_path else msg
     else:
@@ -74,6 +79,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 # Mount routers
 app.include_router(auth_router)
+app.include_router(api_keys_router)
+app.include_router(tickets_router)
 
 
 # Liveness check

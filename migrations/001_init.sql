@@ -1,4 +1,4 @@
-# 001_init.sql - Phase 1 initial schema
+-- 001_init.sql - Phase 1 initial schema
 -- Implements multi-tenant tables: tenants, users, api_keys, tickets, audit_log
 -- Every table (except tenants) has tenant_id referencing tenants(id) and an index on (tenant_id, id).
 
