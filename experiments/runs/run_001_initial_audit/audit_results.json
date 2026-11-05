@@ -1,0 +1,160 @@
+{
+  "total_rows": 20000,
+  "columns": [
+    "ticket_id",
+    "created_at",
+    "product",
+    "channel",
+    "message",
+    "category",
+    "sentiment",
+    "priority",
+    "first_response_hours",
+    "resolution_hours",
+    "status",
+    "csat_score"
+  ],
+  "missing_counts": {
+    "ticket_id": 0,
+    "created_at": 0,
+    "product": 0,
+    "channel": 0,
+    "message": 0,
+    "category": 0,
+    "sentiment": 0,
+    "priority": 0,
+    "first_response_hours": 0,
+    "resolution_hours": 0,
+    "status": 0,
+    "csat_score": 0
+  },
+  "unparseable_dates": 0,
+  "date_range": {
+    "start": "2025-06-01 00:10:00",
+    "end": "2026-05-31 23:28:00"
+  },
+  "category_distribution": {
+    "Technical Issue": 5278,
+    "Feedback": 1945,
+    "Billing": 4328,
+    "Account": 3023,
+    "Shipping": 2846,
+    "Product Inquiry": 2580
+  },
+  "priority_distribution": {
+    "High": 6665,
+    "Low": 4525,
+    "Medium": 5869,
+    "Urgent": 2941
+  },
+  "sentiment_distribution": {
+    "Negative": 15585,
+    "Positive": 967,
+    "Neutral": 3448
+  },
+  "product_distribution": {
+    "CloudDrive": 2500,
+    "PayWallet": 2505,
+    "FitBand X": 2462,
+    "TaskFlow": 2486,
+    "StreamPlus": 2522,
+    "SmartHome Hub": 2462,
+    "PhotoPro": 2543,
+    "EduLearn": 2520
+  },
+  "channel_distribution": {
+    "Email": 6016,
+    "Social Media": 2016,
+    "Chat": 5986,
+    "Phone": 2962,
+    "Web Form": 3020
+  },
+  "cross_tab_category_priority": {
+    "Technical Issue": {
+      "High": 3673,
+      "Urgent": 1605
+    },
+    "Feedback": {
+      "Low": 1945
+    },
+    "Billing": {
+      "High": 2992,
+      "Urgent": 1336
+    },
+    "Account": {
+      "Medium": 3023
+    },
+    "Shipping": {
+      "Medium": 2846
+    },
+    "Product Inquiry": {
+      "Low": 2580
+    }
+  },
+  "message_stats": {
+    "unique_messages": 6104,
+    "duplicate_messages": 13896,
+    "unique_abstract_templates": 680,
+    "conflicting_categories_count": 0,
+    "conflicting_priorities_count": 0
+  },
+  "priority_keyword_cues": {
+    "urgent": 3347,
+    "emergency": 0,
+    "asap": 3153,
+    "immediately": 0,
+    "critical": 0,
+    "high priority": 0,
+    "blocking": 0,
+    "broken": 0
+  },
+  "priority_keyword_distribution": {
+    "asap": {
+      "Urgent": 1573,
+      "Low": 605,
+      "Medium": 975
+    },
+    "urgent": {
+      "Low": 725,
+      "Urgent": 1621,
+      "Medium": 1001
+    }
+  },
+  "chronological_split_leakage": {
+    "train_size": 14000,
+    "val_size": 3000,
+    "test_size": 3000,
+    "test_unique_messages": 2385,
+    "test_exact_messages_in_train": 2114,
+    "test_unique_templates": 660,
+    "test_templates_in_train": 660,
+    "train_categories": {
+      "Billing": 3003,
+      "Shipping": 1955,
+      "Technical Issue": 3764,
+      "Account": 2112,
+      "Feedback": 1354,
+      "Product Inquiry": 1812
+    },
+    "test_categories": {
+      "Product Inquiry": 390,
+      "Account": 461,
+      "Billing": 662,
+      "Feedback": 292,
+      "Technical Issue": 766,
+      "Shipping": 429
+    },
+    "train_priorities": {
+      "High": 4679,
+      "Medium": 4067,
+      "Urgent": 2088,
+      "Low": 3166
+    },
+    "test_priorities": {
+      "Low": 682,
+      "Medium": 890,
+      "High": 1006,
+      "Urgent": 422
+    }
+  }
+}

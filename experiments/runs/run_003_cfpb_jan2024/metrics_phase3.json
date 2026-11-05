@@ -1,0 +1,2429 @@
+{
+  "metadata": {
+    "run_id": "run_003_cfpb_jan2024",
+    "created_at": "2026-11-05T16:37:27.114938",
+    "source_archive": "CCDB_Export_5_September_2023_through_March_2024.csv",
+    "source_hash_sha256": "7a8645f6f602762fcf8cdbf01005aaad9a5834debc9cab549ff94b6b128b1ab0",
+    "extracted_csv": "data/cfpb_complaints_jan2024.csv",
+    "extracted_csv_sha256": "9586914d56e3205e92cae4251d6f200852918f9f40f1236ef821bb7a52b07b5f",
+    "selection_rule": "Deterministic systematic daily sampling from 43,920 eligible January 2024 records to yield exactly 20,000 records covering all 31 days proportionally without splitting any receipt date.",
+    "split_sizes": {
+      "train_rows": 13606,
+      "val_rows": 3326,
+      "test_chronological_rows": 3068,
+      "test_rule1_purged_rows": 2624,
+      "test_rule2_purged_rows": 2558
+    },
+    "split_date_boundaries": {
+      "train": "2024-01-01 to 2024-01-22 (22 days)",
+      "val": "2024-01-23 to 2024-01-26 (4 days)",
+      "test": "2024-01-27 to 2024-01-31 (5 days)"
+    },
+    "tfidf_params": {
+      "ngram_range": [
+        1,
+        2
+      ],
+      "max_features": 25000,
+      "sublinear_tf": true,
+      "strip_accents": "unicode"
+    },
+    "classes": [
+      "Checking or savings account",
+      "Credit card",
+      "Credit reporting or other personal consumer reports",
+      "Debt collection",
+      "Debt or credit management",
+      "Money transfer, virtual currency, or money service",
+      "Mortgage",
+      "Payday loan, title loan, personal loan, or advance loan",
+      "Prepaid card",
+      "Student loan",
+      "Vehicle loan or lease"
+    ]
+  },
+  "audit": {
+    "total_records": 20000,
+    "date_coverage": {
+      "start_date": "2024-01-01",
+      "end_date": "2024-01-31",
+      "total_days": 31,
+      "daily_counts": {
+        "2024-01-01": 240,
+        "2024-01-02": 716,
+        "2024-01-03": 738,
+        "2024-01-04": 827,
+        "2024-01-05": 748,
+        "2024-01-06": 486,
+        "2024-01-07": 353,
+        "2024-01-08": 786,
+        "2024-01-09": 882,
+        "2024-01-10": 849,
+        "2024-01-11": 874,
+        "2024-01-12": 701,
+        "2024-01-13": 296,
+        "2024-01-14": 188,
+        "2024-01-15": 402,
+        "2024-01-16": 495,
+        "2024-01-17": 601,
+        "2024-01-18": 908,
+        "2024-01-19": 888,
+        "2024-01-20": 491,
+        "2024-01-21": 346,
+        "2024-01-22": 791,
+        "2024-01-23": 895,
+        "2024-01-24": 806,
+        "2024-01-25": 823,
+        "2024-01-26": 802,
+        "2024-01-27": 434,
+        "2024-01-28": 301,
+        "2024-01-29": 726,
+        "2024-01-30": 843,
+        "2024-01-31": 764
+      }
+    },
+    "product_distribution": {
+      "Credit reporting or other personal consumer reports": 13882,
+      "Debt collection": 1871,
+      "Credit card": 1339,
+      "Checking or savings account": 1005,
+      "Mortgage": 456,
+      "Student loan": 422,
+      "Money transfer, virtual currency, or money service": 364,
+      "Vehicle loan or lease": 256,
+      "Payday loan, title loan, personal loan, or advance loan": 192,
+      "Prepaid card": 168,
+      "Debt or credit management": 45
+    },
+    "narrative_metrics": {
+      "unique_narratives": 15731,
+      "duplicate_narrative_occurrences": 4269,
+      "word_count_min": 2,
+      "word_count_median": 117,
+      "word_count_mean": 187.64,
+      "word_count_max": 5882,
+      "char_count_median": 662,
+      "char_count_mean": 1073.58,
+      "complaints_with_XXXX_redaction": 14433,
+      "complaints_with_XXXX_redaction_pct": 72.17,
+      "median_redactions_per_complaint": 5,
+      "mean_redactions_per_complaint": 17.77
+    },
+    "leakage_and_splits": {
+      "train_days": "2024-01-01 to 2024-01-22",
+      "train_rows": 13606,
+      "val_days": "2024-01-23 to 2024-01-26",
+      "val_rows": 3326,
+      "test_days": "2024-01-27 to 2024-01-31",
+      "test_rows": 3068,
+      "test_unique_narratives": 2528,
+      "test_unique_narratives_in_train": 111,
+      "test_unique_narratives_in_train_pct": 4.39,
+      "test_unique_narratives_in_train_or_val": 131,
+      "test_unique_narratives_in_train_or_val_pct": 5.18,
+      "test_rule1_purged_rows": 2624,
+      "test_rule2_purged_rows": 2558
+    }
+  },
+  "results_chronological_test": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 3068,
+      "confusion_matrix_sum": 3068,
+      "report_support_sum": 3068.0,
+      "fit_time_seconds": 0.0464,
+      "inference_time_seconds": 0.0008,
+      "latency_ms_per_sample": 0.0003,
+      "accuracy": 0.6887,
+      "macro_precision": 0.0626,
+      "macro_recall": 0.0909,
+      "macro_f1": 0.0742,
+      "weighted_f1": 0.5618,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 217.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.6887222946544981,
+          "recall": 1.0,
+          "f1-score": 0.8156726500675545,
+          "support": 2113.0
+        },
+        "Debt collection": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 264.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 40.0
+        },
+        "accuracy": 0.6887222946544981,
+        "macro avg": {
+          "precision": 0.06261111769586346,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.07415205909705042,
+          "support": 3068.0
+        },
+        "weighted avg": {
+          "precision": 0.47433839915415726,
+          "recall": 0.6887222946544981,
+          "f1-score": 0.5617719392414416,
+          "support": 3068.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          164,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          217,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          2113,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          264,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          8,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          67,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          82,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          22,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          66,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          40,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 3068,
+      "confusion_matrix_sum": 3068,
+      "report_support_sum": 3068.0,
+      "fit_time_seconds": 11.2843,
+      "inference_time_seconds": 0.8327,
+      "latency_ms_per_sample": 0.2714,
+      "accuracy": 0.8439,
+      "macro_precision": 0.7158,
+      "macro_recall": 0.4675,
+      "macro_f1": 0.5303,
+      "weighted_f1": 0.8253,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.6650246305418719,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7356948228882834,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.6852791878172588,
+          "recall": 0.6221198156682027,
+          "f1-score": 0.6521739130434783,
+          "support": 217.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.8739957716701903,
+          "recall": 0.9782300047326077,
+          "f1-score": 0.9231799910674409,
+          "support": 2113.0
+        },
+        "Debt collection": {
+          "precision": 0.7718120805369127,
+          "recall": 0.4356060606060606,
+          "f1-score": 0.5569007263922519,
+          "support": 264.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 1.0,
+          "recall": 0.22388059701492538,
+          "f1-score": 0.36585365853658536,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8983050847457628,
+          "recall": 0.6463414634146342,
+          "f1-score": 0.75177304964539,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.4,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.14814814814814814,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 1.0,
+          "recall": 0.32,
+          "f1-score": 0.48484848484848486,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 1.0,
+          "recall": 0.7272727272727273,
+          "f1-score": 0.8421052631578947,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5789473684210527,
+          "recall": 0.275,
+          "f1-score": 0.3728813559322034,
+          "support": 40.0
+        },
+        "accuracy": 0.8438722294654498,
+        "macro avg": {
+          "precision": 0.7157603748848227,
+          "recall": 0.4675027719386879,
+          "f1-score": 0.5303235830600147,
+          "support": 3068.0
+        },
+        "weighted avg": {
+          "precision": 0.8382985624680781,
+          "recall": 0.8438722294654498,
+          "f1-score": 0.8252637096337107,
+          "support": 3068.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          7,
+          135,
+          70,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          17,
+          2067,
+          16,
+          0,
+          0,
+          3,
+          1,
+          0,
+          0,
+          6
+        ],
+        [
+          3,
+          5,
+          140,
+          115,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          3,
+          4,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          35,
+          6,
+          10,
+          1,
+          0,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          7,
+          1,
+          16,
+          5,
+          0,
+          0,
+          53,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          6,
+          9,
+          2,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          9,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          14,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          48,
+          0
+        ],
+        [
+          4,
+          0,
+          17,
+          4,
+          0,
+          0,
+          2,
+          2,
+          0,
+          0,
+          11
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 3068,
+      "confusion_matrix_sum": 3068,
+      "report_support_sum": 3068.0,
+      "fit_time_seconds": 6.4307,
+      "inference_time_seconds": 0.7799,
+      "latency_ms_per_sample": 0.2542,
+      "accuracy": 0.8611,
+      "macro_precision": 0.6755,
+      "macro_recall": 0.5849,
+      "macro_f1": 0.6206,
+      "weighted_f1": 0.8542,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.7180851063829787,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7670454545454546,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.7411167512690355,
+          "recall": 0.6728110599078341,
+          "f1-score": 0.7053140096618358,
+          "support": 217.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.9104410441044104,
+          "recall": 0.9574065309985802,
+          "f1-score": 0.9333333333333333,
+          "support": 2113.0
+        },
+        "Debt collection": {
+          "precision": 0.6619718309859155,
+          "recall": 0.5340909090909091,
+          "f1-score": 0.5911949685534591,
+          "support": 264.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.8,
+          "recall": 0.5373134328358209,
+          "f1-score": 0.6428571428571429,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8641975308641975,
+          "recall": 0.8536585365853658,
+          "f1-score": 0.8588957055214724,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.35714285714285715,
+          "recall": 0.22727272727272727,
+          "f1-score": 0.2777777777777778,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.9333333333333333,
+          "recall": 0.56,
+          "f1-score": 0.7,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.9152542372881356,
+          "recall": 0.8181818181818182,
+          "f1-score": 0.864,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5294117647058824,
+          "recall": 0.45,
+          "f1-score": 0.4864864864864865,
+          "support": 40.0
+        },
+        "accuracy": 0.8611473272490222,
+        "macro avg": {
+          "precision": 0.675541314188795,
+          "recall": 0.5849005224163976,
+          "f1-score": 0.6206277162488149,
+          "support": 3068.0
+        },
+        "weighted avg": {
+          "precision": 0.8521345195618263,
+          "recall": 0.8611473272490222,
+          "f1-score": 0.8541893242073922,
+          "support": 3068.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          9,
+          0,
+          0,
+          5,
+          0,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          12,
+          146,
+          48,
+          7,
+          0,
+          1,
+          1,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          15,
+          2023,
+          48,
+          0,
+          0,
+          7,
+          3,
+          0,
+          3,
+          9
+        ],
+        [
+          1,
+          10,
+          108,
+          141,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          4,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          23,
+          4,
+          0,
+          2,
+          0,
+          36,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          3,
+          1,
+          3,
+          5,
+          0,
+          0,
+          70,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          6,
+          3,
+          0,
+          1,
+          1,
+          5,
+          0,
+          0,
+          2
+        ],
+        [
+          5,
+          2,
+          1,
+          1,
+          0,
+          2,
+          0,
+          0,
+          14,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          9,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          54,
+          0
+        ],
+        [
+          1,
+          1,
+          11,
+          3,
+          0,
+          0,
+          2,
+          3,
+          0,
+          1,
+          18
+        ]
+      ]
+    }
+  },
+  "results_rule1_purged_test": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2624,
+      "confusion_matrix_sum": 2624,
+      "report_support_sum": 2624.0,
+      "fit_time_seconds": 0.0125,
+      "inference_time_seconds": 0.0002,
+      "latency_ms_per_sample": 0.0001,
+      "accuracy": 0.638,
+      "macro_precision": 0.058,
+      "macro_recall": 0.0909,
+      "macro_f1": 0.0708,
+      "weighted_f1": 0.4969,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 213.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.6379573170731707,
+          "recall": 1.0,
+          "f1-score": 0.7789669613773849,
+          "support": 1674.0
+        },
+        "Debt collection": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 40.0
+        },
+        "accuracy": 0.6379573170731707,
+        "macro avg": {
+          "precision": 0.05799611973392461,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.07081517830703499,
+          "support": 2624.0
+        },
+        "weighted avg": {
+          "precision": 0.40698953840719804,
+          "recall": 0.6379573170731707,
+          "f1-score": 0.4969476727689567,
+          "support": 2624.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          164,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          213,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1674,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          263,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          8,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          67,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          82,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          22,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          66,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          40,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2624,
+      "confusion_matrix_sum": 2624,
+      "report_support_sum": 2624.0,
+      "fit_time_seconds": 11.113,
+      "inference_time_seconds": 0.8344,
+      "latency_ms_per_sample": 0.318,
+      "accuracy": 0.8194,
+      "macro_precision": 0.7135,
+      "macro_recall": 0.4678,
+      "macro_f1": 0.5293,
+      "weighted_f1": 0.7986,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.6650246305418719,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7356948228882834,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.6871794871794872,
+          "recall": 0.6291079812206573,
+          "f1-score": 0.6568627450980392,
+          "support": 213.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.8471138845553822,
+          "recall": 0.9731182795698925,
+          "f1-score": 0.9057547956630525,
+          "support": 1674.0
+        },
+        "Debt collection": {
+          "precision": 0.7718120805369127,
+          "recall": 0.4372623574144487,
+          "f1-score": 0.558252427184466,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 1.0,
+          "recall": 0.22388059701492538,
+          "f1-score": 0.36585365853658536,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8983050847457628,
+          "recall": 0.6463414634146342,
+          "f1-score": 0.75177304964539,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.4,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.14814814814814814,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 1.0,
+          "recall": 0.32,
+          "f1-score": 0.48484848484848486,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 1.0,
+          "recall": 0.7272727272727273,
+          "f1-score": 0.8421052631578947,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5789473684210527,
+          "recall": 0.275,
+          "f1-score": 0.3728813559322034,
+          "support": 40.0
+        },
+        "accuracy": 0.819359756097561,
+        "macro avg": {
+          "precision": 0.71348932145277,
+          "recall": 0.46782392986579036,
+          "f1-score": 0.5292886137365952,
+          "support": 2624.0
+        },
+        "weighted avg": {
+          "precision": 0.8155897110484032,
+          "recall": 0.819359756097561,
+          "f1-score": 0.7986478239817375,
+          "support": 2624.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          7,
+          134,
+          67,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          16,
+          1629,
+          16,
+          0,
+          0,
+          3,
+          1,
+          0,
+          0,
+          6
+        ],
+        [
+          3,
+          5,
+          139,
+          115,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          3,
+          4,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          35,
+          6,
+          10,
+          1,
+          0,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          7,
+          1,
+          16,
+          5,
+          0,
+          0,
+          53,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          6,
+          9,
+          2,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          9,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          14,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          48,
+          0
+        ],
+        [
+          4,
+          0,
+          17,
+          4,
+          0,
+          0,
+          2,
+          2,
+          0,
+          0,
+          11
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2624,
+      "confusion_matrix_sum": 2624,
+      "report_support_sum": 2624.0,
+      "fit_time_seconds": 6.6656,
+      "inference_time_seconds": 0.6711,
+      "latency_ms_per_sample": 0.2558,
+      "accuracy": 0.8422,
+      "macro_precision": 0.676,
+      "macro_recall": 0.5852,
+      "macro_f1": 0.6208,
+      "weighted_f1": 0.8342,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.7180851063829787,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7670454545454546,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.7435897435897436,
+          "recall": 0.6807511737089202,
+          "f1-score": 0.7107843137254902,
+          "support": 213.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.8908785674314493,
+          "recall": 0.951015531660693,
+          "f1-score": 0.9199653279399017,
+          "support": 1674.0
+        },
+        "Debt collection": {
+          "precision": 0.6844660194174758,
+          "recall": 0.5361216730038023,
+          "f1-score": 0.6012793176972282,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.8,
+          "recall": 0.5373134328358209,
+          "f1-score": 0.6428571428571429,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8641975308641975,
+          "recall": 0.8536585365853658,
+          "f1-score": 0.8588957055214724,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.35714285714285715,
+          "recall": 0.22727272727272727,
+          "f1-score": 0.2777777777777778,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.9333333333333333,
+          "recall": 0.56,
+          "f1-score": 0.7,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.9152542372881356,
+          "recall": 0.8181818181818182,
+          "f1-score": 0.864,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5294117647058824,
+          "recall": 0.45,
+          "f1-score": 0.4864864864864865,
+          "support": 40.0
+        },
+        "accuracy": 0.8422256097560976,
+        "macro avg": {
+          "precision": 0.6760326509232776,
+          "recall": 0.5852259659051332,
+          "f1-score": 0.6208265024137232,
+          "support": 2624.0
+        },
+        "weighted avg": {
+          "precision": 0.8325967156208304,
+          "recall": 0.8422256097560976,
+          "f1-score": 0.8342021264822829,
+          "support": 2624.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          9,
+          0,
+          0,
+          5,
+          0,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          12,
+          145,
+          45,
+          7,
+          0,
+          1,
+          1,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          14,
+          1592,
+          41,
+          0,
+          0,
+          7,
+          3,
+          0,
+          3,
+          9
+        ],
+        [
+          1,
+          10,
+          107,
+          141,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          4,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          23,
+          4,
+          0,
+          2,
+          0,
+          36,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          3,
+          1,
+          3,
+          5,
+          0,
+          0,
+          70,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          6,
+          3,
+          0,
+          1,
+          1,
+          5,
+          0,
+          0,
+          2
+        ],
+        [
+          5,
+          2,
+          1,
+          1,
+          0,
+          2,
+          0,
+          0,
+          14,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          9,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          54,
+          0
+        ],
+        [
+          1,
+          1,
+          11,
+          3,
+          0,
+          0,
+          2,
+          3,
+          0,
+          1,
+          18
+        ]
+      ]
+    }
+  },
+  "results_rule2_purged_test": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2558,
+      "confusion_matrix_sum": 2558,
+      "report_support_sum": 2558.0,
+      "fit_time_seconds": 0.0127,
+      "inference_time_seconds": 0.0002,
+      "latency_ms_per_sample": 0.0001,
+      "accuracy": 0.631,
+      "macro_precision": 0.0574,
+      "macro_recall": 0.0909,
+      "macro_f1": 0.0703,
+      "weighted_f1": 0.4882,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 207.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.6309616888193902,
+          "recall": 1.0,
+          "f1-score": 0.7737296260786194,
+          "support": 1614.0
+        },
+        "Debt collection": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 40.0
+        },
+        "accuracy": 0.6309616888193902,
+        "macro avg": {
+          "precision": 0.05736015352903547,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.07033905691623812,
+          "support": 2558.0
+        },
+        "weighted avg": {
+          "precision": 0.39811265275781693,
+          "recall": 0.6309616888193902,
+          "f1-score": 0.4881937515601609,
+          "support": 2558.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          164,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          207,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1614,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          263,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          8,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          67,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          82,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          22,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          66,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          40,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2558,
+      "confusion_matrix_sum": 2558,
+      "report_support_sum": 2558.0,
+      "fit_time_seconds": 11.2129,
+      "inference_time_seconds": 0.6928,
+      "latency_ms_per_sample": 0.2708,
+      "accuracy": 0.8151,
+      "macro_precision": 0.7125,
+      "macro_recall": 0.4668,
+      "macro_f1": 0.5282,
+      "weighted_f1": 0.7939,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.6650246305418719,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7356948228882834,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.6808510638297872,
+          "recall": 0.6183574879227053,
+          "f1-score": 0.6481012658227848,
+          "support": 207.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.842274678111588,
+          "recall": 0.9727385377942999,
+          "f1-score": 0.9028177113283496,
+          "support": 1614.0
+        },
+        "Debt collection": {
+          "precision": 0.7718120805369127,
+          "recall": 0.4372623574144487,
+          "f1-score": 0.558252427184466,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 1.0,
+          "recall": 0.22388059701492538,
+          "f1-score": 0.36585365853658536,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8983050847457628,
+          "recall": 0.6463414634146342,
+          "f1-score": 0.75177304964539,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.4,
+          "recall": 0.09090909090909091,
+          "f1-score": 0.14814814814814814,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 1.0,
+          "recall": 0.32,
+          "f1-score": 0.48484848484848486,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 1.0,
+          "recall": 0.7272727272727273,
+          "f1-score": 0.8421052631578947,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5789473684210527,
+          "recall": 0.275,
+          "f1-score": 0.3728813559322034,
+          "support": 40.0
+        },
+        "accuracy": 0.8150899139953088,
+        "macro avg": {
+          "precision": 0.7124740823806341,
+          "recall": 0.4668120903136499,
+          "f1-score": 0.5282251079538718,
+          "support": 2558.0
+        },
+        "weighted avg": {
+          "precision": 0.8115860160128767,
+          "recall": 0.8150899139953088,
+          "f1-score": 0.7939059208723689,
+          "support": 2558.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          7,
+          128,
+          67,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          15,
+          1570,
+          16,
+          0,
+          0,
+          3,
+          1,
+          0,
+          0,
+          6
+        ],
+        [
+          3,
+          5,
+          139,
+          115,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          3,
+          4,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          35,
+          6,
+          10,
+          1,
+          0,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          7,
+          1,
+          16,
+          5,
+          0,
+          0,
+          53,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          6,
+          9,
+          2,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          9,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          14,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          48,
+          0
+        ],
+        [
+          4,
+          0,
+          17,
+          4,
+          0,
+          0,
+          2,
+          2,
+          0,
+          0,
+          11
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "Product",
+      "train_samples": 13606,
+      "test_samples": 2558,
+      "confusion_matrix_sum": 2558,
+      "report_support_sum": 2558.0,
+      "fit_time_seconds": 6.6819,
+      "inference_time_seconds": 0.8027,
+      "latency_ms_per_sample": 0.3138,
+      "accuracy": 0.8385,
+      "macro_precision": 0.6753,
+      "macro_recall": 0.5843,
+      "macro_f1": 0.62,
+      "weighted_f1": 0.8303,
+      "labels": [
+        "Checking or savings account",
+        "Credit card",
+        "Credit reporting or other personal consumer reports",
+        "Debt collection",
+        "Debt or credit management",
+        "Money transfer, virtual currency, or money service",
+        "Mortgage",
+        "Payday loan, title loan, personal loan, or advance loan",
+        "Prepaid card",
+        "Student loan",
+        "Vehicle loan or lease"
+      ],
+      "classification_report": {
+        "Checking or savings account": {
+          "precision": 0.7180851063829787,
+          "recall": 0.823170731707317,
+          "f1-score": 0.7670454545454546,
+          "support": 164.0
+        },
+        "Credit card": {
+          "precision": 0.7393617021276596,
+          "recall": 0.6714975845410628,
+          "f1-score": 0.7037974683544304,
+          "support": 207.0
+        },
+        "Credit reporting or other personal consumer reports": {
+          "precision": 0.8871527777777778,
+          "recall": 0.949814126394052,
+          "f1-score": 0.9174147217235189,
+          "support": 1614.0
+        },
+        "Debt collection": {
+          "precision": 0.6844660194174758,
+          "recall": 0.5361216730038023,
+          "f1-score": 0.6012793176972282,
+          "support": 263.0
+        },
+        "Debt or credit management": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 8.0
+        },
+        "Money transfer, virtual currency, or money service": {
+          "precision": 0.8,
+          "recall": 0.5373134328358209,
+          "f1-score": 0.6428571428571429,
+          "support": 67.0
+        },
+        "Mortgage": {
+          "precision": 0.8641975308641975,
+          "recall": 0.8536585365853658,
+          "f1-score": 0.8588957055214724,
+          "support": 82.0
+        },
+        "Payday loan, title loan, personal loan, or advance loan": {
+          "precision": 0.35714285714285715,
+          "recall": 0.22727272727272727,
+          "f1-score": 0.2777777777777778,
+          "support": 22.0
+        },
+        "Prepaid card": {
+          "precision": 0.9333333333333333,
+          "recall": 0.56,
+          "f1-score": 0.7,
+          "support": 25.0
+        },
+        "Student loan": {
+          "precision": 0.9152542372881356,
+          "recall": 0.8181818181818182,
+          "f1-score": 0.864,
+          "support": 66.0
+        },
+        "Vehicle loan or lease": {
+          "precision": 0.5294117647058824,
+          "recall": 0.45,
+          "f1-score": 0.4864864864864865,
+          "support": 40.0
+        },
+        "accuracy": 0.8385457388584832,
+        "macro avg": {
+          "precision": 0.6753095753672999,
+          "recall": 0.5842755118656333,
+          "f1-score": 0.6199594613603193,
+          "support": 2558.0
+        },
+        "weighted avg": {
+          "precision": 0.8287454652845799,
+          "recall": 0.8385457388584832,
+          "f1-score": 0.8303052380397624,
+          "support": 2558.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          135,
+          13,
+          9,
+          0,
+          0,
+          5,
+          0,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          12,
+          139,
+          45,
+          7,
+          0,
+          1,
+          1,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          5,
+          13,
+          1533,
+          41,
+          0,
+          0,
+          7,
+          3,
+          0,
+          3,
+          9
+        ],
+        [
+          1,
+          10,
+          107,
+          141,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          4,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          23,
+          4,
+          0,
+          2,
+          0,
+          36,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          3,
+          1,
+          3,
+          5,
+          0,
+          0,
+          70,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          2,
+          6,
+          3,
+          0,
+          1,
+          1,
+          5,
+          0,
+          0,
+          2
+        ],
+        [
+          5,
+          2,
+          1,
+          1,
+          0,
+          2,
+          0,
+          0,
+          14,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          9,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          54,
+          0
+        ],
+        [
+          1,
+          1,
+          11,
+          3,
+          0,
+          0,
+          2,
+          3,
+          0,
+          1,
+          18
+        ]
+      ]
+    }
+  }
+}

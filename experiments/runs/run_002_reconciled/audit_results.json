@@ -1,0 +1,93 @@
+{
+  "metadata": {
+    "run_id": "run_002_reconciled",
+    "created_at": "2026-11-05T15:45:02.317254",
+    "csv_path": "data/customer_support_tickets.csv"
+  },
+  "volume_and_duplicates": {
+    "total_rows": 20000,
+    "full_row_duplicates_including_id": 0,
+    "full_row_duplicates_excluding_id": 0,
+    "unique_messages": 6104,
+    "exact_message_duplicate_rows": 13896
+  },
+  "template_counts_and_definitions": {
+    "abstract_core_intents_count": 24,
+    "abstract_core_intents_definition": "Core sentence after stripping greetings/closings and replacing product with {PRODUCT}. (4 intents per category * 6 categories = 24 intents).",
+    "core_sentence_templates_count": 192,
+    "core_sentence_templates_definition": "Core sentence after stripping greetings/closings, retaining specific product name. (24 intents * 8 products = 192 templates).",
+    "abstract_templates_count": 680,
+    "abstract_templates_definition": "Sentence after replacing product with {PRODUCT}, numbers with {NUM}, greetings with {GREETING}, sign-offs with {SIGN_OFF}, retaining specific prefixes/suffixes (680 distinct forms across dataset; 660 in test split, all seen in train)."
+  },
+  "label_distributions": {
+    "category": {
+      "Technical Issue": 5278,
+      "Feedback": 1945,
+      "Billing": 4328,
+      "Account": 3023,
+      "Shipping": 2846,
+      "Product Inquiry": 2580
+    },
+    "priority": {
+      "High": 6665,
+      "Low": 4525,
+      "Medium": 5869,
+      "Urgent": 2941
+    }
+  },
+  "priority_assignment_rule_audit": {
+    "rule_description": "Feedback & Product Inquiry -> Low; Account & Shipping -> Medium; Technical Issue & Billing -> Urgent if ('urgent' or 'asap' in message) else High",
+    "total_evaluated_rows": 20000,
+    "total_exceptions": 0,
+    "exceptions_list": [],
+    "category_by_priority_crosstab": {
+      "Technical Issue": {
+        "High": 3673,
+        "Urgent": 1605
+      },
+      "Feedback": {
+        "Low": 1945
+      },
+      "Billing": {
+        "High": 2992,
+        "Urgent": 1336
+      },
+      "Account": {
+        "Medium": 3023
+      },
+      "Shipping": {
+        "Medium": 2846
+      },
+      "Product Inquiry": {
+        "Low": 2580
+      }
+    }
+  },
+  "chronological_splits_and_purging": {
+    "train": {
+      "rows": 14000,
+      "unique_messages": 5609
+    },
+    "validation": {
+      "rows": 3000,
+      "unique_messages": 2395,
+      "unique_messages_in_train": 2078,
+      "unique_messages_new_vs_train": 317,
+      "purged_rows_excluding_train_matches": 378
+    },
+    "test_chronological": {
+      "rows": 3000,
+      "unique_messages": 2385,
+      "unique_messages_in_train": 2114,
+      "unique_messages_new_vs_train": 271
+    },
+    "test_rule1_purged_excluding_train_only": {
+      "rows": 332,
+      "unique_messages": 271
+    },
+    "test_rule2_purged_excluding_train_and_val": {
+      "rows": 215,
+      "unique_messages": 178
+    }
+  }
+}

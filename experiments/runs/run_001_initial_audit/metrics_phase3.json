@@ -1,0 +1,1303 @@
+{
+  "metadata": {
+    "date": "2026-11-05T15:35:30.536465",
+    "random_seed": 42,
+    "dataset_total_rows": 20000,
+    "split_sizes": {
+      "train": 14000,
+      "val": 3000,
+      "test_chronological": 3000,
+      "test_deduplicated_unseen_messages": 332
+    },
+    "tfidf_params": {
+      "ngram_range": [
+        1,
+        2
+      ],
+      "max_features": 10000,
+      "sublinear_tf": true,
+      "strip_accents": "unicode"
+    },
+    "priority_mapping": {
+      "Low": "low",
+      "Medium": "normal",
+      "High": "high",
+      "Urgent": "urgent"
+    },
+    "installed_versions": {
+      "scikit-learn": "1.9.1",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "joblib": "1.6.0",
+      "python": "3.14.0"
+    }
+  },
+  "category_results": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.0176,
+      "inference_time_seconds": 0.0005,
+      "latency_ms_per_sample": 0.0002,
+      "accuracy": 0.2553,
+      "macro_precision": 0.0426,
+      "macro_recall": 0.1667,
+      "macro_f1": 0.0678,
+      "weighted_f1": 0.1039,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 461.0
+        },
+        "Billing": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 662.0
+        },
+        "Feedback": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 292.0
+        },
+        "Product Inquiry": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 390.0
+        },
+        "Shipping": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 429.0
+        },
+        "Technical Issue": {
+          "precision": 0.25533333333333336,
+          "recall": 1.0,
+          "f1-score": 0.4067976633032395,
+          "support": 766.0
+        },
+        "accuracy": 0.25533333333333336,
+        "macro avg": {
+          "precision": 0.04255555555555556,
+          "recall": 0.16666666666666666,
+          "f1-score": 0.06779961055053992,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 0.06519511111111112,
+          "recall": 0.25533333333333336,
+          "f1-score": 0.10386900336342715,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          461
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          662
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          292
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          390
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          429
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          766
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.301,
+      "inference_time_seconds": 0.0421,
+      "latency_ms_per_sample": 0.014,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 461.0
+        },
+        "Billing": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 662.0
+        },
+        "Feedback": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 292.0
+        },
+        "Product Inquiry": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 390.0
+        },
+        "Shipping": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 429.0
+        },
+        "Technical Issue": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 766.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          461,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          662,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          292,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          390,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          429,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          766
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.8171,
+      "inference_time_seconds": 0.0411,
+      "latency_ms_per_sample": 0.0137,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 461.0
+        },
+        "Billing": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 662.0
+        },
+        "Feedback": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 292.0
+        },
+        "Product Inquiry": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 390.0
+        },
+        "Shipping": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 429.0
+        },
+        "Technical Issue": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 766.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          461,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          662,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          292,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          390,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          429,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          766
+        ]
+      ]
+    }
+  },
+  "priority_results": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.0029,
+      "inference_time_seconds": 0.0001,
+      "latency_ms_per_sample": 0.0,
+      "accuracy": 0.3353,
+      "macro_precision": 0.0838,
+      "macro_recall": 0.25,
+      "macro_f1": 0.1256,
+      "weighted_f1": 0.1684,
+      "urgent_recall": 0.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 682.0
+        },
+        "normal": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 890.0
+        },
+        "high": {
+          "precision": 0.3353333333333333,
+          "recall": 1.0,
+          "f1-score": 0.5022466300549177,
+          "support": 1006.0
+        },
+        "urgent": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 422.0
+        },
+        "accuracy": 0.3353333333333333,
+        "macro avg": {
+          "precision": 0.08383333333333333,
+          "recall": 0.25,
+          "f1-score": 0.1255616575137294,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 0.11244844444444443,
+          "recall": 0.3353333333333333,
+          "f1-score": 0.16842003661174904,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          682,
+          0
+        ],
+        [
+          0,
+          0,
+          890,
+          0
+        ],
+        [
+          0,
+          0,
+          1006,
+          0
+        ],
+        [
+          0,
+          0,
+          422,
+          0
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.2796,
+      "inference_time_seconds": 0.0444,
+      "latency_ms_per_sample": 0.0148,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": 1.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 682.0
+        },
+        "normal": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 890.0
+        },
+        "high": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1006.0
+        },
+        "urgent": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 422.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          682,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          890,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1006,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          422
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 3000,
+      "fit_time_seconds": 0.5092,
+      "inference_time_seconds": 0.0409,
+      "latency_ms_per_sample": 0.0136,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": 1.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 682.0
+        },
+        "normal": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 890.0
+        },
+        "high": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1006.0
+        },
+        "urgent": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 422.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3000.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          682,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          890,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1006,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          422
+        ]
+      ]
+    }
+  },
+  "category_results_dedup_test": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.009,
+      "inference_time_seconds": 0.0001,
+      "latency_ms_per_sample": 0.0003,
+      "accuracy": 0.1054,
+      "macro_precision": 0.0176,
+      "macro_recall": 0.1667,
+      "macro_f1": 0.0318,
+      "weighted_f1": 0.0201,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 71.0
+        },
+        "Billing": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 39.0
+        },
+        "Feedback": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 44.0
+        },
+        "Product Inquiry": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 64.0
+        },
+        "Shipping": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 79.0
+        },
+        "Technical Issue": {
+          "precision": 0.10542168674698796,
+          "recall": 1.0,
+          "f1-score": 0.1907356948228883,
+          "support": 35.0
+        },
+        "accuracy": 0.10542168674698796,
+        "macro avg": {
+          "precision": 0.017570281124497992,
+          "recall": 0.16666666666666666,
+          "f1-score": 0.031789282470481385,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 0.011113732036580056,
+          "recall": 0.10542168674698796,
+          "f1-score": 0.02010767867108762,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          71
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          39
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          44
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          64
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          79
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          35
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.2666,
+      "inference_time_seconds": 0.0055,
+      "latency_ms_per_sample": 0.0165,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 71.0
+        },
+        "Billing": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 39.0
+        },
+        "Feedback": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 44.0
+        },
+        "Product Inquiry": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 64.0
+        },
+        "Shipping": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 79.0
+        },
+        "Technical Issue": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 35.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          71,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          39,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          44,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          64,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          79,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          35
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "category",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.9034,
+      "inference_time_seconds": 0.0053,
+      "latency_ms_per_sample": 0.016,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": null,
+      "labels": [
+        "Account",
+        "Billing",
+        "Feedback",
+        "Product Inquiry",
+        "Shipping",
+        "Technical Issue"
+      ],
+      "classification_report": {
+        "Account": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 71.0
+        },
+        "Billing": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 39.0
+        },
+        "Feedback": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 44.0
+        },
+        "Product Inquiry": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 64.0
+        },
+        "Shipping": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 79.0
+        },
+        "Technical Issue": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 35.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          71,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          39,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          44,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          64,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          79,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          35
+        ]
+      ]
+    }
+  },
+  "priority_results_dedup_test": {
+    "majority_baseline": {
+      "model": "majority_baseline",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.0027,
+      "inference_time_seconds": 0.0001,
+      "latency_ms_per_sample": 0.0002,
+      "accuracy": 0.1386,
+      "macro_precision": 0.0346,
+      "macro_recall": 0.25,
+      "macro_f1": 0.0608,
+      "weighted_f1": 0.0337,
+      "urgent_recall": 0.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 108.0
+        },
+        "normal": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 150.0
+        },
+        "high": {
+          "precision": 0.13855421686746988,
+          "recall": 1.0,
+          "f1-score": 0.24338624338624337,
+          "support": 46.0
+        },
+        "urgent": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 28.0
+        },
+        "accuracy": 0.13855421686746988,
+        "macro avg": {
+          "precision": 0.03463855421686747,
+          "recall": 0.25,
+          "f1-score": 0.06084656084656084,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 0.019197271011757874,
+          "recall": 0.13855421686746988,
+          "f1-score": 0.03372219034869637,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          108,
+          0
+        ],
+        [
+          0,
+          0,
+          150,
+          0
+        ],
+        [
+          0,
+          0,
+          46,
+          0
+        ],
+        [
+          0,
+          0,
+          28,
+          0
+        ]
+      ]
+    },
+    "tfidf_logistic_regression": {
+      "model": "tfidf_logistic_regression",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.3407,
+      "inference_time_seconds": 0.0059,
+      "latency_ms_per_sample": 0.0179,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": 1.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 108.0
+        },
+        "normal": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 150.0
+        },
+        "high": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 46.0
+        },
+        "urgent": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 28.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          108,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          150,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          46,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          28
+        ]
+      ]
+    },
+    "tfidf_linear_svc": {
+      "model": "tfidf_linear_svc",
+      "target": "priority",
+      "train_samples": 14000,
+      "test_samples": 332,
+      "fit_time_seconds": 0.4809,
+      "inference_time_seconds": 0.0052,
+      "latency_ms_per_sample": 0.0155,
+      "accuracy": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "urgent_recall": 1.0,
+      "labels": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "classification_report": {
+        "low": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 108.0
+        },
+        "normal": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 150.0
+        },
+        "high": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 46.0
+        },
+        "urgent": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 28.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 332.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          108,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          150,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          46,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          28
+        ]
+      ]
+    }
+  }
+}

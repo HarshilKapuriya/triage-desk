@@ -1,0 +1,28 @@
+{
+  "rule_description": "Feedback & Product Inquiry -> Low; Account & Shipping -> Medium; Technical Issue & Billing -> Urgent if ('urgent' or 'asap' in message) else High",
+  "total_evaluated_rows": 20000,
+  "total_exceptions": 0,
+  "exceptions_list": [],
+  "category_by_priority_crosstab": {
+    "Technical Issue": {
+      "High": 3673,
+      "Urgent": 1605
+    },
+    "Feedback": {
+      "Low": 1945
+    },
+    "Billing": {
+      "High": 2992,
+      "Urgent": 1336
+    },
+    "Account": {
+      "Medium": 3023
+    },
+    "Shipping": {
+      "Medium": 2846
+    },
+    "Product Inquiry": {
+      "Low": 2580
+    }
+  }
+}
