@@ -110,8 +110,9 @@ Triage Desk enforces credential isolation depending on the operation:
 ### Tickets (`/v1/tickets`)
 - `POST /v1/tickets`: Ingest ticket (API Key only).
   - Body: `{"subject": "...", "body": "...", "external_id": "optional", "customer_email": "optional"}`
+  - Atomically creates the ticket and enqueues a `ticket_ingest` job in `jobs` table within a single transaction.
   - Returns `202 Accepted` on new ticket creation with `{"id": "...", "status": "received", "external_id": "..."}`.
-  - Returns `200 OK` if a ticket with the same `external_id` already exists for this tenant (idempotent replay).
+  - Returns `200 OK` if a ticket with the same `external_id` already exists for this tenant (idempotent replay, no duplicate job).
 - `GET /v1/tickets`: List tickets for tenant (JWT or API Key).
   - Query parameters: `status` (optional), `limit` (1-200, default 50), `offset` (>= 0, default 0).
   - Returns a plain JSON array of tickets `[...]` ordered newest first (`created_at DESC, id DESC`).
@@ -144,7 +145,7 @@ python -m pytest tests/test_security.py -v
 python -m pytest tests/test_health.py -v
 
 # Run database integration tests (requires configured TEST_DATABASE_URL)
-python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py -v
+python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py -v
 
 # Run the dedicated two-tenant isolation test (SPEC Section 10)
 python -m pytest tests/test_isolation.py -v
@@ -155,5 +156,5 @@ python -m pytest tests/test_isolation.py -v
 >
 > In GitHub Actions CI (`.github/workflows/ci.yml`), a dedicated PostgreSQL 16 service container is configured to provision automatically, apply migrations using `scripts/migrate.py`, and run the full test suite against the throwaway CI database.
 >
-> **Current CI Status**: GitHub CI is currently blocked before execution due to an account-level billing lock ("The job was not started because your account is locked due to a billing issue"). Phase 1 has been thoroughly verified locally against a dedicated PostgreSQL test database (52 passed, 0 failed, 0 skipped).
+> **Current CI Status & Temporary Phase-Gate Exception**: GitHub CI is currently blocked before execution due to an account-level billing lock ("The job was not started because your account is locked due to a billing issue"). Under an approved temporary phase-gate exception, passing all local PostgreSQL tests against the separate `TEST_DATABASE_URL` gates development, while GitHub CI verification remains an explicitly outstanding requirement.
 

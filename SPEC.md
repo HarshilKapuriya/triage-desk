@@ -144,6 +144,8 @@ Tests need a throwaway database. In CI use a PostgreSQL service container. Local
 
 Phase 1 is done when all boxes are ticked and CI is green.
 
+*Temporary Phase-Gate Exception (Approved 2026-11-05)*: Passing local PostgreSQL tests against the separate `TEST_DATABASE_URL` may gate Phase 2 development while GitHub CI is blocked due to the repository account billing issue. GitHub CI verification remains an explicitly outstanding requirement and is not waived.
+
 ## 10. The two-tenant isolation test
 
 Write this as one test module, `tests/test_isolation.py`, and run it in CI.

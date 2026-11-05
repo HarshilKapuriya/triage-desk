@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.db import get_connection
 from app.deps import Principal, get_api_key_principal, get_any_principal
 import app.repositories.tickets as ticket_repo
+import app.repositories.jobs as job_repo
 
 router = APIRouter(prefix="/v1/tickets", tags=["Tickets"])
 
@@ -98,6 +99,13 @@ def create_ticket(
                 external_id=payload.external_id,
                 customer_email=payload.customer_email,
             )
+            if is_created:
+                job_repo.enqueue_job(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    ticket_id=ticket_record.id,
+                    job_type="ticket_ingest",
+                )
 
     response.status_code = status.HTTP_202_ACCEPTED if is_created else status.HTTP_200_OK
     return _to_response_model(ticket_record)
