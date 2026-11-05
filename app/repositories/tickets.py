@@ -68,23 +68,7 @@ def create_or_get_ticket(
         is_created is True if a new ticket was created, False if an existing ticket was returned.
     """
     with conn.cursor(row_factory=dict_row) as cur:
-        # If external_id is provided, check idempotency first
-        if external_id is not None:
-            cur.execute(
-                """
-                SELECT id, tenant_id, external_id, subject, body, customer_email,
-                       status, category, priority, created_at, first_response_at,
-                       resolved_at, assignee_id
-                FROM tickets
-                WHERE tenant_id = %s AND external_id = %s;
-                """,
-                (tenant_id, external_id),
-            )
-            existing = cur.fetchone()
-            if existing:
-                return _row_to_ticket(existing), False
-
-        # Attempt insert with ON CONFLICT DO NOTHING for external_id
+        # Attempt atomic insert with ON CONFLICT DO NOTHING for external_id
         if external_id is not None:
             cur.execute(
                 """
@@ -102,7 +86,7 @@ def create_or_get_ticket(
             if created_row:
                 return _row_to_ticket(created_row), True
 
-            # If ON CONFLICT was triggered concurrently, fetch the existing ticket
+            # If ON CONFLICT was triggered (ticket already exists), fetch existing ticket
             cur.execute(
                 """
                 SELECT id, tenant_id, external_id, subject, body, customer_email,

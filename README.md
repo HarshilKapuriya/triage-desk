@@ -67,6 +67,20 @@ Once running:
 - **Liveness probe**: `GET http://localhost:8000/healthz` -> `{"status": "ok"}`
 - **Interactive API Docs (Swagger)**: `http://localhost:8000/docs`
 
+### 6. Running the Background Worker Process
+
+The queue worker runs as a separate standalone daemon process, polling the `jobs` table using `SELECT ... FOR UPDATE SKIP LOCKED` without busy-waiting:
+
+```powershell
+python -m app.worker.main
+```
+
+Optional CLI arguments:
+- `--poll-interval <seconds>`: Sleep duration when the queue is empty (default: 1.0s). Cleanly interrupted on signal.
+- `--lease-seconds <seconds>`: Worker lease duration before an unrenewed job is considered abandoned (default: 300s).
+
+The worker handles graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM, automatically performs periodic stale job recovery sweeps, and schedules retries with exponential backoff.
+
 ---
 
 ## API Authentication Conventions
@@ -80,7 +94,7 @@ Triage Desk enforces credential isolation depending on the operation:
    - Acquired via `POST /v1/auth/login`.
 
 2. **API Key Authentication** (Ingestion and programmatic access):
-   - Ticket ingestion (`POST /v1/tickets`) strictly requires an API key. User JWTs return `401 Unauthorized`.
+   - Ticket ingestion (`POST /v1/tickets` and `POST /v1/tickets/bulk`) strictly requires an API key. User JWTs return `401 Unauthorized`.
    - Header: `X-API-Key: tk_<random_string>`
    - Supported alternative: `Authorization: Bearer tk_<random_string>`
    - Keys are created by tenant admins via `POST /v1/api-keys`.
@@ -113,6 +127,14 @@ Triage Desk enforces credential isolation depending on the operation:
   - Atomically creates the ticket and enqueues a `ticket_ingest` job in `jobs` table within a single transaction.
   - Returns `202 Accepted` on new ticket creation with `{"id": "...", "status": "received", "external_id": "..."}`.
   - Returns `200 OK` if a ticket with the same `external_id` already exists for this tenant (idempotent replay, no duplicate job).
+- `POST /v1/tickets/bulk`: Bulk ingest tickets via CSV (API Key only).
+  - Format: Raw CSV body with headers (`subject,body,external_id,customer_email`).
+  - Limits: Maximum 500 rows per request, maximum 5 MB payload size.
+  - Streaming: Reads request body in chunks via `request.stream()`, counting actual incoming bytes and aborting with `422 Unprocessable Content` immediately if size exceeds 5 MB without relying solely on `Content-Length`.
+  - Validation: Whole-file pre-validation. Any malformed row, missing required header, or length violation rejects the entire request with `422 Unprocessable Content` (no partial commits).
+  - Atomicity: Newly created tickets and their matching `ticket_ingest` jobs commit together in a single transaction.
+  - Idempotency: Existing `external_id` references within the tenant replay without creating duplicate tickets or jobs.
+  - Returns `202 Accepted` with `{"received": N, "created": C, "replayed": R, "ticket_ids": [...]}`.
 - `GET /v1/tickets`: List tickets for tenant (JWT or API Key).
   - Query parameters: `status` (optional), `limit` (1-200, default 50), `offset` (>= 0, default 0).
   - Returns a plain JSON array of tickets `[...]` ordered newest first (`created_at DESC, id DESC`).
@@ -145,7 +167,7 @@ python -m pytest tests/test_security.py -v
 python -m pytest tests/test_health.py -v
 
 # Run database integration tests (requires configured TEST_DATABASE_URL)
-python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py -v
+python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py -v
 
 # Run the dedicated two-tenant isolation test (SPEC Section 10)
 python -m pytest tests/test_isolation.py -v

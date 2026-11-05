@@ -1,9 +1,12 @@
-"""Ticket router: POST /v1/tickets, GET /v1/tickets, and GET /v1/tickets/{id}.
+"""Ticket router: POST /v1/tickets, POST /v1/tickets/bulk, GET /v1/tickets, and GET /v1/tickets/{id}.
 
 Per SPEC.md Section 7:
 - POST /v1/tickets: API key only.
   New ticket: 202 with id and status: "new".
   Existing external_id for same tenant: 200 with existing ticket.
+- POST /v1/tickets/bulk: API key only.
+  CSV bulk upload. Atomically creates tickets and enqueues ingest jobs.
+  Returns 202 with received, created, replayed counts and ticket IDs.
 - GET /v1/tickets: JWT or API key.
   Returns list of tickets for caller's tenant, newest first.
   Filters: status, limit (default 50, max 200), offset (>= 0).
@@ -11,10 +14,12 @@ Per SPEC.md Section 7:
   Returns ticket with 200, or 404 if missing or another tenant's ticket.
 """
 
+import csv
 from datetime import datetime
+import io
 from typing import Annotated
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.db import get_connection
@@ -23,6 +28,9 @@ import app.repositories.tickets as ticket_repo
 import app.repositories.jobs as job_repo
 
 router = APIRouter(prefix="/v1/tickets", tags=["Tickets"])
+
+MAX_CSV_BYTES = 5 * 1024 * 1024  # 5 MB upload limit
+MAX_CSV_ROWS = 500  # Max 500 rows per batch
 
 
 class CreateTicketRequest(BaseModel):
@@ -109,6 +117,215 @@ def create_ticket(
 
     response.status_code = status.HTTP_202_ACCEPTED if is_created else status.HTTP_200_OK
     return _to_response_model(ticket_record)
+
+
+class BulkTicketResponse(BaseModel):
+    received: int
+    created: int
+    replayed: int
+    ticket_ids: list[str]
+
+
+@router.post(
+    "/bulk",
+    response_model=BulkTicketResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ingest tickets via CSV upload (API key only)",
+)
+async def bulk_create_tickets(
+    request: Request,
+    principal: Annotated[Principal, Depends(get_api_key_principal)],
+) -> BulkTicketResponse:
+    """Bulk ingest support tickets from a CSV payload.
+
+    API key authentication only.
+    Atomic: validates whole file upfront, then creates tickets and enqueues jobs in a transaction.
+    Replays existing external_id without creating duplicate tickets or duplicate jobs.
+    """
+    byte_chunks: list[bytes] = []
+    total_bytes = 0
+
+    async for chunk in request.stream():
+        total_bytes += len(chunk)
+        if total_bytes > MAX_CSV_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "code": "invalid_input",
+                    "message": f"CSV payload exceeds maximum size limit of {MAX_CSV_BYTES // (1024 * 1024)} MB.",
+                },
+            )
+        byte_chunks.append(chunk)
+
+    raw_bytes = b"".join(byte_chunks)
+
+    try:
+        content = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "invalid_input",
+                "message": "CSV content must be valid UTF-8.",
+            },
+        )
+
+    if not content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "invalid_input",
+                "message": "CSV body is empty.",
+            },
+        )
+
+    try:
+        reader = csv.DictReader(io.StringIO(content))
+        headers = reader.fieldnames
+        if not headers or "subject" not in headers or "body" not in headers:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "code": "invalid_input",
+                    "message": "CSV missing required column headers ('subject', 'body').",
+                },
+            )
+
+        validated_rows: list[dict[str, str | None]] = []
+        for row_idx, row in enumerate(reader, start=1):
+            if row_idx > MAX_CSV_ROWS:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={
+                        "code": "invalid_input",
+                        "message": f"CSV row count exceeds maximum limit of {MAX_CSV_ROWS} rows.",
+                    },
+                )
+
+            subject_raw = row.get("subject")
+            subject = subject_raw.strip() if subject_raw else ""
+            if not subject:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={
+                        "code": "invalid_input",
+                        "message": f"Row {row_idx}: subject is required and cannot be blank.",
+                    },
+                )
+            if len(subject) > 300:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={
+                        "code": "invalid_input",
+                        "message": f"Row {row_idx}: subject exceeds maximum length of 300 characters.",
+                    },
+                )
+
+            body_raw = row.get("body")
+            body = body_raw.strip() if body_raw else ""
+            if not body:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={
+                        "code": "invalid_input",
+                        "message": f"Row {row_idx}: body is required and cannot be blank.",
+                    },
+                )
+            if len(body) > 20000:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={
+                        "code": "invalid_input",
+                        "message": f"Row {row_idx}: body exceeds maximum length of 20,000 characters.",
+                    },
+                )
+
+            ext_id_raw = row.get("external_id")
+            ext_id = ext_id_raw.strip() if ext_id_raw else None
+            if ext_id:
+                if len(ext_id) > 255:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail={
+                            "code": "invalid_input",
+                            "message": f"Row {row_idx}: external_id exceeds maximum length of 255 characters.",
+                        },
+                    )
+            else:
+                ext_id = None
+
+            email_raw = row.get("customer_email")
+            email = email_raw.strip() if email_raw else None
+            if email:
+                if len(email) > 255:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail={
+                            "code": "invalid_input",
+                            "message": f"Row {row_idx}: customer_email exceeds maximum length of 255 characters.",
+                        },
+                    )
+            else:
+                email = None
+
+            validated_rows.append({
+                "subject": subject,
+                "body": body,
+                "external_id": ext_id,
+                "customer_email": email,
+            })
+
+    except csv.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "invalid_input",
+                "message": f"Malformed CSV syntax: {str(e)}",
+            },
+        )
+
+    if not validated_rows:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "invalid_input",
+                "message": "CSV contains no data rows.",
+            },
+        )
+
+    ticket_ids: list[str] = []
+    created_count = 0
+    replayed_count = 0
+
+    with get_connection() as conn:
+        with conn.transaction():
+            for item in validated_rows:
+                ticket_record, is_created = ticket_repo.create_or_get_ticket(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    subject=item["subject"],  # type: ignore[arg-type]
+                    body=item["body"],  # type: ignore[arg-type]
+                    external_id=item["external_id"],
+                    customer_email=item["customer_email"],
+                )
+                if is_created:
+                    job_repo.enqueue_job(
+                        conn=conn,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_record.id,
+                        job_type="ticket_ingest",
+                    )
+                    created_count += 1
+                else:
+                    replayed_count += 1
+                ticket_ids.append(str(ticket_record.id))
+
+    return BulkTicketResponse(
+        received=len(validated_rows),
+        created=created_count,
+        replayed=replayed_count,
+        ticket_ids=ticket_ids,
+    )
 
 
 @router.get(

@@ -149,3 +149,266 @@ def get_job_by_id(
             return None
         return _row_to_job_record(row)
 
+
+# --- Platform-level Worker Operations (Approved Narrow Exception) ---
+
+
+class StaleClaimError(Exception):
+    """Raised when a worker attempts an operation on a job whose lease expired or generation changed."""
+
+
+def claim_next_job(
+    conn: psycopg.Connection,
+    worker_id: str,
+    lease_seconds: int = 300,
+    tenant_id: uuid.UUID | None = None,
+) -> JobRecord | None:
+    """Claim the next eligible queued job atomically.
+
+    Approved platform-level exception: operates without tenant_id to service the shared queue.
+    An optional tenant_id can be passed by isolated test suites to prevent draining unrelated fixtures.
+    Uses SELECT ... FOR UPDATE SKIP LOCKED and increments attempts generation on claim.
+    Deterministic ordering: run_after ASC, created_at ASC, id ASC.
+    """
+    query = """
+        WITH next_job AS (
+            SELECT id
+            FROM jobs
+            WHERE status = 'queued'
+              AND run_after <= NOW()
+              AND attempts < max_attempts
+              AND (%s::uuid IS NULL OR tenant_id = %s)
+            ORDER BY run_after ASC, created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE jobs j
+        SET status = 'running',
+            locked_at = NOW(),
+            locked_by = %s,
+            attempts = attempts + 1,
+            updated_at = NOW()
+        FROM next_job
+        WHERE j.id = next_job.id
+        RETURNING
+            j.id, j.tenant_id, j.ticket_id, j.type, j.status,
+            j.attempts, j.max_attempts, j.run_after, j.locked_at, j.locked_by,
+            j.created_at, j.updated_at, j.completed_at, j.failed_at, j.error, j.payload;
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query, (tenant_id, tenant_id, worker_id))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return _row_to_job_record(row)
+
+
+def renew_lease(
+    conn: psycopg.Connection,
+    job_id: uuid.UUID,
+    worker_id: str,
+    generation: int,
+    lease_seconds: int = 300,
+) -> bool:
+    """Renew the lease on an active job.
+
+    Strictly validates that:
+    1. The job is currently in 'running' status.
+    2. The caller matches locked_by.
+    3. The claim generation matches attempts.
+    4. The current lease has NOT already expired (NOW <= locked_at + lease_seconds).
+    Returns True if successfully renewed; False otherwise.
+    """
+    query = """
+        UPDATE jobs
+        SET locked_at = NOW(),
+            updated_at = NOW()
+        WHERE id = %s
+          AND status = 'running'
+          AND locked_by = %s
+          AND attempts = %s
+          AND locked_at >= NOW() - (%s || ' seconds')::interval;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query, (job_id, worker_id, generation, lease_seconds))
+        return cur.rowcount > 0
+
+
+def complete_job_with_ticket_transition(
+    conn: psycopg.Connection,
+    tenant_id: uuid.UUID,
+    job_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    worker_id: str,
+    generation: int,
+    lease_seconds: int = 300,
+) -> bool:
+    """Atomically validate claim, apply ticket state transition and audit log, and complete job.
+
+    All mutations occur inside the caller's transaction. If claim ownership or lease validity
+    is lost, raises StaleClaimError ensuring zero side-effects commit.
+    """
+    # 1. Validate and complete the job claim atomically
+    complete_query = """
+        UPDATE jobs
+        SET status = 'completed',
+            completed_at = NOW(),
+            locked_at = NULL,
+            locked_by = NULL,
+            updated_at = NOW()
+        WHERE id = %s
+          AND tenant_id = %s
+          AND status = 'running'
+          AND locked_by = %s
+          AND attempts = %s
+          AND locked_at >= NOW() - (%s || ' seconds')::interval;
+    """
+    with conn.cursor() as cur:
+        cur.execute(complete_query, (job_id, tenant_id, worker_id, generation, lease_seconds))
+        if cur.rowcount == 0:
+            raise StaleClaimError("Cannot complete job: active lease expired or generation mismatch.")
+
+    # 2. Lock and inspect ticket status
+    actor = f"worker:{worker_id}"
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "SELECT status FROM tickets WHERE tenant_id = %s AND id = %s FOR UPDATE;",
+            (tenant_id, ticket_id),
+        )
+        t_row = cur.fetchone()
+        if not t_row:
+            raise RuntimeError(f"Referenced ticket {ticket_id} not found for tenant {tenant_id}.")
+
+        current_status = t_row["status"]
+
+        if current_status == "new":
+            cur.execute(
+                "UPDATE tickets SET status = 'open' WHERE tenant_id = %s AND id = %s AND status = 'new';",
+                (tenant_id, ticket_id),
+            )
+            cur.execute(
+                "INSERT INTO audit_log (tenant_id, actor, action) VALUES (%s, %s, 'ticket.processed');",
+                (tenant_id, actor),
+            )
+        else:
+            # Leave ticket status unchanged, record skipped audit log
+            cur.execute(
+                "INSERT INTO audit_log (tenant_id, actor, action) VALUES (%s, %s, 'ticket.ingest_skipped_already_progressed');",
+                (tenant_id, actor),
+            )
+
+    return True
+
+
+def fail_or_retry_job(
+    conn: psycopg.Connection,
+    tenant_id: uuid.UUID,
+    job_id: uuid.UUID,
+    worker_id: str,
+    generation: int,
+    error_message: str,
+) -> str:
+    """Record job failure or schedule exponential backoff retry.
+
+    Returns:
+        str: 'requeued', 'failed', or 'stale_claim'.
+    """
+    # Sanitize and truncate error
+    sanitized_error = error_message.strip()[:255] if error_message else "unknown_error"
+
+    query_check = """
+        SELECT attempts, max_attempts
+        FROM jobs
+        WHERE id = %s
+          AND tenant_id = %s
+          AND status = 'running'
+          AND locked_by = %s
+          AND attempts = %s;
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query_check, (job_id, tenant_id, worker_id, generation))
+        row = cur.fetchone()
+        if not row:
+            return "stale_claim"
+
+        attempts = row["attempts"]
+        max_attempts = row["max_attempts"]
+
+        if attempts < max_attempts:
+            # Exponential backoff: 2s, 4s, 8s...
+            delay_seconds = 2 * (2 ** max(0, attempts - 1))
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'queued',
+                    run_after = NOW() + (%s || ' seconds')::interval,
+                    locked_at = NULL,
+                    locked_by = NULL,
+                    error = %s,
+                    updated_at = NOW()
+                WHERE id = %s AND tenant_id = %s;
+                """,
+                (delay_seconds, sanitized_error, job_id, tenant_id),
+            )
+            return "requeued"
+        else:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'failed',
+                    failed_at = NOW(),
+                    locked_at = NULL,
+                    locked_by = NULL,
+                    error = %s,
+                    updated_at = NOW()
+                WHERE id = %s AND tenant_id = %s;
+                """,
+                (sanitized_error, job_id, tenant_id),
+            )
+            return "failed"
+
+
+def recover_stale_jobs(
+    conn: psycopg.Connection,
+    lease_seconds: int = 300,
+    tenant_id: uuid.UUID | None = None,
+) -> int:
+    """Scan and recover orphaned jobs whose lease expired.
+
+    Approved platform-level exception: operates without tenant_id.
+    Optional tenant_id limits recovery to a specific tenant in tests.
+    Requeues jobs if attempts < max_attempts with exponential backoff;
+    otherwise marks them failed.
+    """
+    query = """
+        WITH stale_jobs AS (
+            SELECT id
+            FROM jobs
+            WHERE status = 'running'
+              AND locked_at < NOW() - (%s || ' seconds')::interval
+              AND (%s::uuid IS NULL OR tenant_id = %s)
+            ORDER BY locked_at ASC, id ASC
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE jobs j
+        SET status = CASE WHEN j.attempts >= j.max_attempts THEN 'failed' ELSE 'queued' END,
+            failed_at = CASE WHEN j.attempts >= j.max_attempts THEN NOW() ELSE NULL END,
+            run_after = CASE
+                WHEN j.attempts >= j.max_attempts THEN j.run_after
+                ELSE NOW() + (INTERVAL '2 seconds' * (2 ^ GREATEST(0, j.attempts - 1)))
+            END,
+            locked_at = NULL,
+            locked_by = NULL,
+            error = CASE
+                WHEN j.attempts >= j.max_attempts THEN 'lease_timeout_exhausted'
+                ELSE 'lease_timeout_requeued'
+            END,
+            updated_at = NOW()
+        FROM stale_jobs
+        WHERE j.id = stale_jobs.id;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query, (lease_seconds, tenant_id, tenant_id))
+        return cur.rowcount
+
+
