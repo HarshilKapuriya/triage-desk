@@ -82,7 +82,12 @@ Every table except `tenants` has a `tenant_id uuid not null references tenants(i
 ## 6. Tenant isolation rules (non-negotiable)
 
 1. The tenant always comes from the credential: an API key is hashed and looked up, and a JWT carries a `tenant_id` claim. Never read the tenant from the request body, query string or URL.
-2. All database access goes through `app/repositories/`. Every repository function takes `tenant_id` as a required argument and uses it in every query. No SQL anywhere else.
+2. All database access goes through `app/repositories/`. Every tenant-owned repository function takes `tenant_id` as a required argument and uses it in every query. No SQL anywhere else.
+   - Clarification: The only pre-authentication exceptions are:
+     a) Creating a new tenant during signup.
+     b) Looking up a user by globally unique normalized email for login.
+     c) Looking up an API key by its unique hash for authentication.
+   - These exceptions must live in dedicated, clearly named repository functions and are not general-purpose cross-tenant query interfaces. Once authentication resolves the tenant, all subsequent tenant-owned operations must strictly use that resolved tenant_id. Never accept a tenant_id from the signup/login request to bypass this.
 3. A resource that belongs to another tenant returns `404`, never `403`, so its existence is not revealed.
 4. API keys are stored only as SHA-256 hashes, shown in full once at creation, and revocable.
 5. The two-tenant isolation test (section 10) must stay green. A change that breaks it is not allowed.
