@@ -50,7 +50,7 @@ Required environment variables in `.env`:
 ### 4. Database Migrations
 
 #### Standard Migration Procedure (Fresh Databases & CI)
-The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`), managed by `scripts/migrate.py`.
+The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`, `004_embeddings_duplicates.sql`), managed by `scripts/migrate.py`.
 
 To apply all pending migrations on a new database:
 ```powershell
@@ -317,7 +317,7 @@ python -m pytest tests/test_security.py -v
 python -m pytest tests/test_health.py -v
 
 # Run database integration tests (requires configured TEST_DATABASE_URL)
-python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py -v
+python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py tests/test_duplicates_db.py -v
 
 # Run the dedicated two-tenant isolation test (SPEC Section 10)
 python -m pytest tests/test_isolation.py -v
@@ -326,16 +326,19 @@ python -m pytest tests/test_isolation.py -v
 > **Note on Integration Tests & CI**:
 > Database integration tests require a configured `TEST_DATABASE_URL` that resolves to a different database target than `DATABASE_URL`. They do NOT run against `DATABASE_URL`. If `TEST_DATABASE_URL` is empty, integration tests will be skipped locally.
 >
-> In GitHub Actions CI (`.github/workflows/ci.yml`), a dedicated PostgreSQL 16 service container is configured to provision automatically, apply migrations using `scripts/migrate.py`, and run the full test suite against the throwaway CI database.
+> *Safety Check Limitation*: The `resolve_safe_test_db_url()` safety helper compares the parsed connection tuple `(host, port, dbname, user)`. In Supabase, connection poolers embed the project reference in the username (`postgres.<project_ref>`), which validates distinct projects when both URLs use poolers. However, a mixed configuration (e.g. direct `db.<ref>.supabase.co` vs pooler `postgres.<ref>@aws-...pooler.supabase.com`) would present different connection tuples despite pointing to the same underlying project. Distinct project references must always be maintained.
 >
-> **Current CI Status & Temporary Phase-Gate Exception**: GitHub Actions CI status remains unverified on GitHub remote runners due to an observed account billing block preventing workflow execution ("The job was not started because your account is locked due to a billing issue"). Under an approved temporary phase-gate exception, passing all local PostgreSQL tests against the separate `TEST_DATABASE_URL` gates development, while remote GitHub Actions verification remains explicitly unverified and outstanding.
+> In GitHub Actions CI (`.github/workflows/ci.yml`), a dedicated PostgreSQL service container using `pgvector/pgvector:pg16` is configured as a prerequisite for migration 004 to provision automatically, apply migrations using `scripts/migrate.py`, and run the test suite against the throwaway CI database.
+>
+> **Current CI Status & Temporary Phase-Gate Exception**: GitHub Actions CI status remains unverified on GitHub remote runners due to an observed account billing block preventing workflow execution ("The job was not started because your account is locked due to a billing issue"). The CI container image update to `pgvector/pgvector:pg16` represents a CI compatibility prerequisite correction, not a verified remote run. Under an approved temporary phase-gate exception, passing all local PostgreSQL tests against the separate `TEST_DATABASE_URL` gates development, while remote GitHub Actions verification remains explicitly unverified and outstanding.
 
 ---
 
 ## Verification & Testing Record
 
 ### 1. Automated Test Suite (FastAPI, Pytest & TypeScript)
-- **Full Pytest Regression Suite (`pytest -q`)**: 132 passed, 0 failed, 1 Starlette deprecation warning (`Using 'httpx' with 'starlette.testclient' is deprecated; install 'httpx2' instead.`, recorded separately).
+- **Historical Full Pytest Regression Suite (`pytest -q`, prior to narrow corrections)**: 147 passed, 0 failed, 1 Starlette deprecation warning (`Using 'httpx' with 'starlette.testclient' is deprecated; install 'httpx2' instead.`, recorded separately). Note: This historical baseline reflects 133 pre-existing tests (including the 9th processing status edge-case test) plus 14 initial Phase 4 tests.
+- **Duplicate Detection Focused Integration Tests (`pytest tests/test_duplicates_db.py -v`)**: 14 passed, 0 failed (verifying Phase 4 schema and repository foundations—not working automatic duplicate detection—including migration 004 rerun idempotency, vector(384) dimension constraints, `math.isfinite` cosine similarity bounds [-1.0, 1.0] rejecting NaN/inf, canonical undirected link ordering, review-state consistency enforced via repository validation [suggested => NULL, confirmed/rejected => timestamp, rejecting contradictory inputs; migration 004 defines nullable reviewed_at without status-tying DB check constraint], self-link & cross-tenant DB rejection, tenant isolation, idempotency/upsert, and cascade deletion).
 - **Processing Status Focused Integration Tests (`pytest tests/test_browser_ui.py -k "test_browser_processing_status" -v`)**: 9 passed, 0 failed (verifying all 6 queue pipeline states, retry delay handling, and raw error/worker ID sanitization).
 - **TypeScript Static Verification (`npx tsc --noEmit`)**: 0 type errors.
 - **Production Bundle Build (`npm run build`)**: Built cleanly into `frontend/dist/` in 1.03s.
