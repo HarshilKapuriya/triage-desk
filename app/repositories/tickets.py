@@ -36,7 +36,7 @@ class TicketRecord:
 
 @dataclass(frozen=True)
 class TicketListItem:
-    """Read-only view of a ticket list row with prediction metadata."""
+    """Read-only view of a ticket list row with prediction and job processing metadata."""
     id: uuid.UUID
     tenant_id: uuid.UUID
     external_id: str | None
@@ -50,6 +50,10 @@ class TicketListItem:
     predicted_label: str | None
     model_name: str | None
     model_version: str | None
+    job_status: str | None = None
+    job_attempts: int | None = None
+    job_max_attempts: int | None = None
+    job_run_after: datetime | None = None
 
 
 def _row_to_ticket(row: dict[str, Any]) -> TicketRecord:
@@ -201,16 +205,20 @@ def list_tickets_with_prediction(
     limit: int = 20,
     offset: int = 0,
 ) -> list[TicketListItem]:
-    """List tickets with optional prediction metadata, strictly scoped to tenant_id."""
+    """List tickets with optional prediction and processing metadata, strictly scoped to tenant_id."""
     query = """
         SELECT t.id, t.tenant_id, t.external_id, t.subject, t.body, t.customer_email,
                t.status, t.category, t.priority, t.created_at,
-               p.predicted_label, m.name AS model_name, m.version AS model_version
+               p.predicted_label, m.name AS model_name, m.version AS model_version,
+               j.status AS job_status, j.attempts AS job_attempts,
+               j.max_attempts AS job_max_attempts, j.run_after AS job_run_after
         FROM tickets t
         LEFT JOIN ticket_predictions p
           ON t.id = p.ticket_id AND t.tenant_id = p.tenant_id AND p.task = 'category'
         LEFT JOIN model_versions m
           ON p.model_version_id = m.id AND p.tenant_id = m.tenant_id
+        LEFT JOIN jobs j
+          ON t.id = j.ticket_id AND t.tenant_id = j.tenant_id AND j.type = 'ticket_ingest'
         WHERE t.tenant_id = %s
         ORDER BY t.created_at DESC, t.id DESC
         LIMIT %s OFFSET %s;
@@ -233,6 +241,10 @@ def list_tickets_with_prediction(
                 predicted_label=r["predicted_label"],
                 model_name=r["model_name"],
                 model_version=r["model_version"],
+                job_status=r["job_status"],
+                job_attempts=r["job_attempts"],
+                job_max_attempts=r["job_max_attempts"],
+                job_run_after=r["job_run_after"],
             )
             for r in rows
         ]

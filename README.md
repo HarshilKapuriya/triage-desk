@@ -282,6 +282,15 @@ Triage Desk enforces credential isolation depending on the operation:
 - `GET /v1/tickets/{id}`: Get ticket detail by UUID (JWT or API Key).
   - Returns `200 OK` with full ticket details or `404 Not Found` if missing or belonging to another tenant.
 
+### Browser API (`/browser-api`) - React Frontend
+- `GET /browser-api/csrf-token`: Retrieve signed, session-bound CSRF token.
+- `POST /browser-api/auth/login`: Authenticate browser user; issues HttpOnly `triage_session` cookie.
+- `POST /browser-api/auth/logout`: Log out browser user and clear cookie.
+- `GET /browser-api/auth/session`: Return active user session metadata and refreshed CSRF token.
+- `GET /browser-api/tickets`: Paginated ticket list with ML predictions and accurate processing status (`queued`, `processing`, `retry_scheduled`, `completed`, `failed`, `not_found`).
+- `POST /browser-api/tickets`: Submit new ticket from browser and enqueue background worker job.
+- `GET /browser-api/tickets/{id}`: Ticket detail with sanitized processing status, refresh capability, and ML prediction diagnostics.
+
 ---
 
 ## Running Tests
@@ -326,15 +335,23 @@ python -m pytest tests/test_isolation.py -v
 ## Verification & Testing Record
 
 ### 1. Automated Test Suite (FastAPI, Pytest & TypeScript)
-- **Pytest Suite (`pytest -q`)**: 124 passed, 0 failed, 1 Starlette deprecation warning (`Using 'httpx' with 'starlette.testclient' is deprecated; install 'httpx2' instead.`, recorded separately).
+- **Full Pytest Regression Suite (`pytest -q`)**: 132 passed, 0 failed, 1 Starlette deprecation warning (`Using 'httpx' with 'starlette.testclient' is deprecated; install 'httpx2' instead.`, recorded separately).
+- **Processing Status Focused Integration Tests (`pytest tests/test_browser_ui.py -k "test_browser_processing_status" -v`)**: 9 passed, 0 failed (verifying all 6 queue pipeline states, retry delay handling, and raw error/worker ID sanitization).
 - **TypeScript Static Verification (`npx tsc --noEmit`)**: 0 type errors.
-- **Production Bundle Build (`npm run build`)**: Built cleanly into `frontend/dist/`.
+- **Production Bundle Build (`npm run build`)**: Built cleanly into `frontend/dist/` in 1.03s.
 
-### 2. Manual Browser Smoke Test Record (2026-11-06)
-*Conducted by the user in a live browser session against origin `http://localhost:5173`, clearly separated from automated test runs:*
-- **Login Flow**: User successfully authenticated at `http://localhost:5173/login` using registered demo tenant credentials (`demo.agent@example.com`); received HttpOnly session cookie and navigated to `/tickets`.
-- **New Ticket Submission**: User clicked "+ New Ticket" on the ticket queue view, entered subject and complaint narrative, verified character counts and domain notice, and submitted the form.
-- **Immediate Navigation**: Form disabled repeated clicks during submission and routed to the created ticket detail page (`/tickets/{id}`).
-- **Queue & Worker Processing**: The background queue worker claimed the job, executed inference using the loaded `run_004` LinearSVC model, and committed the prediction.
-- **Live React Prediction Display**: The ticket detail page rendered the submitted ticket body, predicted category (`Checking or savings account`), model version (`run_004`), `Confidence unavailable` label, and raw decision margin scores.
+### 2. Manual Browser Testing Record (2026-11-06)
+- **Ticket Submission Smoke Test (Conducted by User)**:
+  *Conducted by the user in a live browser session against origin `http://localhost:5173`, clearly separated from automated test runs:*
+  - **Login Flow**: User authenticated at `http://localhost:5173/login` with `demo.agent@example.com`; received HttpOnly session cookie and routed to ticket queue.
+  - **Ticket Submission**: User submitted a new synthetic complaint from the browser UI form.
+  - **Navigation & Processing**: Navigated immediately to ticket detail; background worker claimed and classified complaint.
+  - **Prediction Display**: Detail view displayed predicted label (`Checking or savings account`), model version (`run_004`), and decision margins.
+- **Processing Status & Refresh Verification (Conducted by User)**:
+  - **Agent Role**: The AI agent did **not** perform live browser testing for this feature; all agent verification was conducted via automated API and TypeScript integration suites.
+  - **User Verification**: The user performed manual verification in a live browser session against `http://localhost:5173` and specifically confirmed:
+    1. The Processing column and "Completed" state badge display correctly in the ticket list view.
+    2. The detail-page "Processing Status" card displays correctly with queue status details.
+    3. The manual "↻ Refresh" button works properly and the saved prediction remains visible.
+    - *Scope Note: Failed and retry states were verified via automated integration assertions; the user did not manually test failed or retry states.*
 

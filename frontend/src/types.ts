@@ -5,6 +5,12 @@ export interface User {
   email?: string | null;
 }
 
+export interface ProcessingStatus {
+  state: 'queued' | 'processing' | 'retry_scheduled' | 'completed' | 'failed' | 'not_found' | string;
+  label: string;
+  details?: string | null;
+}
+
 export interface TicketListItem {
   id: string;
   external_id: string | null;
@@ -17,6 +23,7 @@ export interface TicketListItem {
   predicted_label: string | null;
   model_name: string | null;
   model_version: string | null;
+  processing_status: ProcessingStatus;
 }
 
 export interface Pagination {
@@ -57,6 +64,7 @@ export interface DomainNotices {
 export interface TicketDetailResponse {
   ticket: TicketDetail;
   prediction: ModelPrediction | null;
+  processing: ProcessingStatus;
   notices: DomainNotices;
 }
 

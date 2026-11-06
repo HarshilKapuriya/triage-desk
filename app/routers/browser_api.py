@@ -8,7 +8,7 @@ Preserves:
 - Explicit JSON 401 unauthenticated errors (never HTML redirects).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import secrets
 from typing import Any
 import uuid
@@ -29,7 +29,7 @@ from app.deps_browser import (
     validate_browser_csrf,
 )
 from app.repositories.auth import get_user_by_email
-from app.repositories.jobs import enqueue_job
+from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
 from app.repositories.ml import get_prediction_with_model_for_ticket
 from app.repositories.tickets import (
     count_tickets,
@@ -46,6 +46,88 @@ from app.security import (
 )
 
 router = APIRouter(prefix="/browser-api", tags=["Browser API"])
+
+
+def derive_processing_status(
+    status: str | None,
+    attempts: int | None = None,
+    max_attempts: int | None = None,
+    run_after: datetime | None = None,
+) -> dict[str, Any]:
+    """Derive user-facing processing state, label, and generic details.
+
+    Maps real job queue statuses strictly to authorized user-facing states:
+    - Queued: job enqueued, attempts == 0.
+    - Processing: actively running in background worker.
+    - Retry Scheduled: failed prior attempt, queued with attempts > 0 and future run_after.
+    - Completed: worker finished classification and ticket updates.
+    - Failed: permanent failure after retries exhausted (attempts >= max_attempts).
+    - No Job Found: no job record exists.
+
+    Security note: Strictly omits raw database error messages, stack traces,
+    worker hostnames, and credentials.
+    """
+    if status is None:
+        return {
+            "state": "not_found",
+            "label": "No Job Found",
+            "details": "No background processing job was found for this ticket.",
+        }
+
+    if status == "running":
+        return {
+            "state": "processing",
+            "label": "Processing",
+            "details": "Worker is currently analyzing the complaint narrative.",
+        }
+
+    if status == "completed":
+        return {
+            "state": "completed",
+            "label": "Completed",
+            "details": None,
+        }
+
+    if status == "failed":
+        return {
+            "state": "failed",
+            "label": "Failed",
+            "details": "Processing encountered an error and could not complete automated triage.",
+        }
+
+    if status == "queued":
+        if attempts is not None and attempts > 0:
+            now = datetime.now(timezone.utc)
+            is_future = False
+            if run_after is not None:
+                if run_after.tzinfo is None:
+                    is_future = run_after > datetime.utcnow()
+                else:
+                    is_future = run_after > now
+
+            if is_future:
+                return {
+                    "state": "retry_scheduled",
+                    "label": "Retry Scheduled",
+                    "details": "Temporary processing issue encountered; retry scheduled.",
+                }
+            # When run_after is due or in the past, the job is actively queued waiting for next worker pickup
+            return {
+                "state": "queued",
+                "label": "Queued",
+                "details": "Prior attempt encountered an issue; waiting in queue for worker.",
+            }
+        return {
+            "state": "queued",
+            "label": "Queued",
+            "details": "Waiting in queue for worker classification.",
+        }
+
+    return {
+        "state": "unknown",
+        "label": status.capitalize(),
+        "details": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +350,12 @@ def list_tickets_json(
                 "predicted_label": t.predicted_label,
                 "model_name": t.model_name,
                 "model_version": t.model_version,
+                "processing_status": derive_processing_status(
+                    t.job_status,
+                    t.job_attempts,
+                    t.job_max_attempts,
+                    t.job_run_after,
+                ),
             }
             for t in items
         ],
@@ -359,6 +447,12 @@ def get_ticket_detail_json(
             ticket_uuid,
             task="category",
         )
+        job = get_job_by_ticket_id(
+            conn,
+            principal.tenant_id,
+            ticket_uuid,
+            job_type="ticket_ingest",
+        )
 
     pred_data = None
     if prediction:
@@ -371,6 +465,13 @@ def get_ticket_detail_json(
             "decision_scores": prediction.decision_scores,
             "created_at": prediction.created_at.isoformat() if prediction.created_at else None,
         }
+
+    processing_status = derive_processing_status(
+        job.status if job else None,
+        job.attempts if job else None,
+        job.max_attempts if job else None,
+        job.run_after if job else None,
+    )
 
     return {
         "ticket": {
@@ -385,6 +486,7 @@ def get_ticket_detail_json(
             "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
         },
         "prediction": pred_data,
+        "processing": processing_status,
         "notices": {
             "domain_notice": "CFPB financial product classifier (run_004 baseline). Does not detect out-of-domain inquiries.",
             "confidence_notice": "LinearSVC margins represent uncalibrated hyperplane distances, not probabilities.",

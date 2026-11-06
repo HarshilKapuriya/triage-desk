@@ -1,4 +1,5 @@
 import { TicketListItem, Pagination } from '../types';
+import { ProcessingBadge } from './ProcessingBadge';
 
 interface TicketsListViewProps {
   tickets: TicketListItem[];
@@ -65,13 +66,14 @@ export const TicketsListView = ({
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: '140px' }}>Ticket ID</th>
-                <th style={{ width: '140px' }}>Received</th>
+                <th style={{ width: '130px' }}>Ticket ID</th>
+                <th style={{ width: '130px' }}>Received</th>
                 <th>Subject & Customer</th>
                 <th style={{ width: '90px' }}>Status</th>
-                <th style={{ width: '150px' }}>Human Category</th>
-                <th style={{ width: '270px' }}>Model Prediction</th>
-                <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                <th style={{ width: '140px' }}>Human Category</th>
+                <th style={{ width: '130px' }}>Processing</th>
+                <th style={{ width: '220px' }}>Model Prediction</th>
+                <th style={{ width: '70px', textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -126,6 +128,9 @@ export const TicketsListView = ({
                       )}
                     </td>
                     <td>
+                      <ProcessingBadge status={t.processing_status} />
+                    </td>
+                    <td>
                       {t.predicted_label ? (
                         <div>
                           <div style={{ marginBottom: '2px' }}>
@@ -135,6 +140,14 @@ export const TicketsListView = ({
                             {t.model_name} ({t.model_version})
                           </div>
                         </div>
+                      ) : t.processing_status?.state === 'failed' ? (
+                        <span className="text-muted" style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                          Unavailable (Failed)
+                        </span>
+                      ) : t.processing_status?.state === 'completed' || t.processing_status?.state === 'not_found' ? (
+                        <span className="text-muted" style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                          None
+                        </span>
                       ) : (
                         <span className="badge badge-pending">Prediction Pending</span>
                       )}
@@ -153,7 +166,7 @@ export const TicketsListView = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
                     {loading ? 'Loading tickets...' : 'No tickets found in this tenant inbox.'}
                   </td>
                 </tr>

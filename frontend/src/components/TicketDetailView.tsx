@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { TicketDetailResponse } from '../types';
+import { ProcessingBadge } from './ProcessingBadge';
 
 interface TicketDetailViewProps {
   ticketId: string;
@@ -10,28 +11,33 @@ interface TicketDetailViewProps {
 export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) => {
   const [data, setData] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+  const fetchDetail = async (isManualRefresh = false) => {
+    if (isManualRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
-    api
-      .getTicketDetail(ticketId)
-      .then((res) => {
-        if (isMounted) setData(res);
-      })
-      .catch((err) => {
-        if (isMounted) setError(err instanceof Error ? err.message : 'Failed to load ticket.');
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+    try {
+      const res = await api.getTicketDetail(ticketId);
+      setData(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load ticket.');
+    } finally {
+      if (isManualRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    fetchDetail(false);
   }, [ticketId]);
 
   if (loading) {
@@ -62,7 +68,7 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
     );
   }
 
-  const { ticket, prediction, notices } = data;
+  const { ticket, prediction, processing, notices } = data;
 
   // Sort decision margin scores descending if available
   const sortedScores = prediction?.decision_scores
@@ -71,8 +77,15 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
 
   return (
     <div>
-      {/* Back button */}
-      <div style={{ marginBottom: '20px' }}>
+      {/* Top Action Bar: Back button and Refresh button */}
+      <div
+        style={{
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <button
           type="button"
           onClick={onBack}
@@ -91,6 +104,16 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
           }}
         >
           ← Back to Ticket Queue
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => fetchDetail(true)}
+          disabled={refreshing || loading}
+          style={{ padding: '6px 12px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          {refreshing ? 'Refreshing...' : '↻ Refresh'}
         </button>
       </div>
 
@@ -206,6 +229,60 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
             </p>
           </div>
 
+          {/* Card: Background Processing Status */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: 'var(--text-main)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Processing Status
+              </h2>
+              <ProcessingBadge status={processing} />
+            </div>
+
+            <div style={{ fontSize: '13px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: processing?.details ? '1px solid var(--border-color)' : 'none',
+                  paddingBottom: processing?.details ? '8px' : '0',
+                }}
+              >
+                <span className="text-muted">Queue Status:</span>
+                <strong style={{ textTransform: 'capitalize' }}>
+                  {processing?.state ? processing.state.replace('_', ' ') : 'Not Found'}
+                </strong>
+              </div>
+
+              {processing?.details && (
+                <div
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: processing.state === 'failed' ? 'var(--danger)' : 'var(--text-muted)',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {processing.details}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Card 2: Automated Model Prediction */}
           <div className="card" style={{ padding: '20px' }}>
             <div
@@ -229,6 +306,10 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
               </h2>
               {prediction ? (
                 <span className="badge badge-pred">Active</span>
+              ) : processing?.state === 'failed' ? (
+                <span className="badge badge-failed">Unavailable</span>
+              ) : processing?.state === 'completed' || processing?.state === 'not_found' ? (
+                <span className="badge badge-not-found">None</span>
               ) : (
                 <span className="badge badge-pending">Prediction Pending</span>
               )}
@@ -318,12 +399,23 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
               </div>
             ) : (
               <div style={{ padding: '16px 0', textAlign: 'center' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  No model prediction record exists for this ticket.
+                <p style={{ fontSize: '13px', color: 'var(--text-main)', marginBottom: '8px', fontWeight: 500 }}>
+                  {processing?.state === 'failed'
+                    ? 'Automated prediction unavailable; review required.'
+                    : processing?.state === 'completed'
+                    ? 'No model prediction was generated for this ticket.'
+                    : processing?.state === 'not_found'
+                    ? 'No automated processing job was found for this ticket.'
+                    : 'Model prediction is pending background processing.'}
                 </p>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Inference occurs asynchronously via background worker jobs. Check worker process status if jobs remain
-                  pending.
+                  {processing?.state === 'failed'
+                    ? 'Background processing encountered an error and could not complete automated triage.'
+                    : processing?.state === 'completed'
+                    ? 'Worker completed processing without producing a category prediction.'
+                    : processing?.state === 'not_found'
+                    ? 'This ticket was created without an associated ingestion job.'
+                    : 'Inference occurs asynchronously via background worker jobs. Use the Refresh button above to check for updates.'}
                 </p>
               </div>
             )}

@@ -756,3 +756,454 @@ def test_browser_create_ticket_client_tenant_id_cannot_control_ownership(client:
     client.cookies.set("triage_session", token_b)
     r_b_detail = client.get(f"/browser-api/tickets/{created_id}")
     assert r_b_detail.status_code == 404
+
+
+# ===========================================================================
+# 13. Accurate Ticket Processing Status & Error Sanitization
+# ===========================================================================
+
+@skip_no_test_db
+def test_browser_processing_status_queued_initial(client: TestClient):
+    """Initial ticket submission reports queued processing state and null prediction."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "Billing issue", "body": "Overcharged by bank on statement."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "queued"
+    assert data["processing"]["label"] == "Queued"
+    assert "Waiting in queue" in data["processing"]["details"]
+    assert data["prediction"] is None
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "queued"
+    assert list_item["processing_status"]["label"] == "Queued"
+    assert list_item["predicted_label"] is None
+
+
+@skip_no_test_db
+def test_browser_processing_status_running_processing(client: TestClient):
+    """Running worker job reports processing state and never leaks worker_id."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "In-flight job ticket", "body": "Narrative currently being processed by worker."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    secret_worker_id = "worker_internal_hostname_node_99"
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'running',
+                    attempts = 1,
+                    locked_at = NOW(),
+                    locked_by = %s
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (secret_worker_id, tenant_id, ticket_id),
+            )
+        conn.commit()
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "processing"
+    assert data["processing"]["label"] == "Processing"
+    assert "currently analyzing" in data["processing"]["details"]
+    # Verify internal worker identity is not leaked
+    assert secret_worker_id not in r_detail.text
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "processing"
+    assert list_item["processing_status"]["label"] == "Processing"
+    assert secret_worker_id not in r_list.text
+
+
+@skip_no_test_db
+def test_browser_processing_status_retry_scheduled(client: TestClient):
+    """Job awaiting retry reports retry_scheduled and sanitizes internal exception."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "Transient error ticket", "body": "Narrative with transient worker error."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    raw_error_message = "psycopg.errors.OperationalError: could not connect to server: Connection refused (0x0000274D/10061)"
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'queued',
+                    attempts = 1,
+                    run_after = NOW() + interval '30 seconds',
+                    error = %s
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (raw_error_message, tenant_id, ticket_id),
+            )
+        conn.commit()
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "retry_scheduled"
+    assert data["processing"]["label"] == "Retry Scheduled"
+    assert "retry scheduled" in data["processing"]["details"]
+    # Verify raw database connection error is never leaked
+    assert "OperationalError" not in r_detail.text
+    assert "Connection refused" not in r_detail.text
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "retry_scheduled"
+    assert list_item["processing_status"]["label"] == "Retry Scheduled"
+    assert "OperationalError" not in r_list.text
+
+
+@skip_no_test_db
+def test_browser_processing_status_queued_after_retry_delay_elapsed(client: TestClient):
+    """Queued job with attempts > 0 whose run_after is due/past maps to waiting queued state, not unknown or missing."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "Due for retry ticket", "body": "Complaint whose scheduled retry interval has elapsed."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'queued',
+                    attempts = 1,
+                    run_after = NOW() - interval '10 seconds',
+                    error = 'Temporary network timeout'
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (tenant_id, ticket_id),
+            )
+        conn.commit()
+
+    # Detail check: must map to sensible queued waiting state, never unknown or not_found
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "queued"
+    assert data["processing"]["label"] == "Queued"
+    assert "waiting in queue" in data["processing"]["details"].lower()
+    assert data["prediction"] is None
+
+    # List check: must map to queued waiting state
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "queued"
+    assert list_item["processing_status"]["label"] == "Queued"
+
+
+@skip_no_test_db
+def test_browser_processing_status_completed_with_prediction(client: TestClient):
+    """Completed job with prediction reports completed state and active prediction."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "Completed ticket", "body": "Complaint that was classified successfully."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = uuid.UUID(r_create.json()["id"])
+
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'completed',
+                    completed_at = NOW(),
+                    attempts = 1
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (tenant_id, ticket_id),
+            )
+        # Ensure tenant model version and save prediction
+        mv = ensure_tenant_model_version(
+            conn=conn,
+            tenant_id=tenant_id,
+            name="cfpb_financial_product_classifier",
+            version="run_004",
+            task="category",
+            artifact_path="experiments/models/cfpb_linearsvc_run_004.joblib",
+            sha256_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            classes=["Credit reporting", "Debt collection"],
+        )
+        save_ticket_prediction(
+            conn=conn,
+            tenant_id=tenant_id,
+            ticket_id=ticket_id,
+            model_version_id=mv.id,
+            task="category",
+            predicted_label="Credit reporting",
+            confidence=None,
+            decision_scores={"Credit reporting": 1.25, "Debt collection": -0.42},
+        )
+        conn.commit()
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "completed"
+    assert data["processing"]["label"] == "Completed"
+    assert data["processing"]["details"] is None
+    assert data["prediction"] is not None
+    assert data["prediction"]["predicted_label"] == "Credit reporting"
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == str(ticket_id))
+    assert list_item["processing_status"]["state"] == "completed"
+    assert list_item["processing_status"]["label"] == "Completed"
+    assert list_item["predicted_label"] == "Credit reporting"
+
+
+@skip_no_test_db
+def test_browser_processing_status_completed_without_prediction(client: TestClient):
+    """Completed job with no prediction record reports completed state and null prediction (not pending)."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "No pred ticket", "body": "Job completed but no prediction was saved."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'completed',
+                    completed_at = NOW(),
+                    attempts = 1
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (tenant_id, ticket_id),
+            )
+        conn.commit()
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "completed"
+    assert data["processing"]["label"] == "Completed"
+    assert data["prediction"] is None
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "completed"
+    assert list_item["processing_status"]["label"] == "Completed"
+    assert list_item["predicted_label"] is None
+
+
+@skip_no_test_db
+def test_browser_processing_status_failed_error_sanitization(client: TestClient):
+    """Permanently failed job reports failed state and strictly sanitizes raw exceptions and credentials."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    r_csrf = client.get("/browser-api/csrf-token")
+    csrf_token = r_csrf.json()["csrf_token"]
+
+    r_create = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"subject": "Permanent failure ticket", "body": "Narrative where retries were exhausted."},
+    )
+    assert r_create.status_code == 201
+    ticket_id = r_create.json()["id"]
+
+    secret_leak_error = (
+        'psycopg.errors.UndefinedTable: relation "ticket_predictions" does not exist '
+        'LINE 1: INSERT INTO ticket_predictions ... user="admin_db" password="super_secret_password_123"'
+    )
+    with psycopg.connect(TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET status = 'failed',
+                    failed_at = NOW(),
+                    attempts = 3,
+                    max_attempts = 3,
+                    error = %s
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (secret_leak_error, tenant_id, ticket_id),
+            )
+        conn.commit()
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "failed"
+    assert data["processing"]["label"] == "Failed"
+    assert data["processing"]["details"] == "Processing encountered an error and could not complete automated triage."
+    assert data["prediction"] is None
+
+    # Strict assertion: sensitive strings from error column must NEVER appear anywhere in response text
+    assert "super_secret_password_123" not in r_detail.text
+    assert "admin_db" not in r_detail.text
+    assert "UndefinedTable" not in r_detail.text
+    assert "ticket_predictions" not in r_detail.json()["processing"]["details"]
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "failed"
+    assert list_item["processing_status"]["label"] == "Failed"
+    assert "super_secret_password_123" not in r_list.text
+
+
+@skip_no_test_db
+def test_browser_processing_status_no_job_found(client: TestClient):
+    """Ticket created without an ingestion job reports not_found state."""
+    tenant_id, user_id, _email, _pwd = _create_test_user()
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="admin")
+    client.cookies.set("triage_session", token)
+
+    # Insert a ticket directly without an ingest job
+    with psycopg.connect(TEST_DB_URL) as conn:
+        ticket_rec, _ = create_or_get_ticket(
+            conn=conn,
+            tenant_id=tenant_id,
+            subject="Legacy ticket without job",
+            body="Inserted before Phase 2 jobs queue was introduced.",
+        )
+        conn.commit()
+
+    ticket_id = str(ticket_rec.id)
+
+    # Detail check
+    r_detail = client.get(f"/browser-api/tickets/{ticket_id}")
+    assert r_detail.status_code == 200
+    data = r_detail.json()
+    assert data["processing"]["state"] == "not_found"
+    assert data["processing"]["label"] == "No Job Found"
+    assert "No background processing job was found" in data["processing"]["details"]
+    assert data["prediction"] is None
+
+    # List check
+    r_list = client.get("/browser-api/tickets")
+    assert r_list.status_code == 200
+    list_item = next(item for item in r_list.json()["tickets"] if item["id"] == ticket_id)
+    assert list_item["processing_status"]["state"] == "not_found"
+    assert list_item["processing_status"]["label"] == "No Job Found"
+    assert list_item["predicted_label"] is None
+
+
+@skip_no_test_db
+def test_browser_processing_status_tenant_isolation(client: TestClient):
+    """Processing status and job details cannot leak across tenants."""
+    tenant_a, user_a, _email_a, _pwd_a = _create_test_user()
+    tenant_b, user_b, _email_b, _pwd_b = _create_test_user()
+
+    # Create ticket in Tenant A
+    token_a = create_access_token(user_id=user_a, tenant_id=tenant_a, role="admin")
+    client.cookies.set("triage_session", token_a)
+
+    r_csrf_a = client.get("/browser-api/csrf-token")
+    r_create_a = client.post(
+        "/browser-api/tickets",
+        headers={"X-CSRF-Token": r_csrf_a.json()["csrf_token"]},
+        json={"subject": "Tenant A Secret Complaint", "body": "Confidential financial issue in Tenant A."},
+    )
+    assert r_create_a.status_code == 201
+    ticket_a_id = r_create_a.json()["id"]
+
+    # Switch session to Tenant B
+    token_b = create_access_token(user_id=user_b, tenant_id=tenant_b, role="admin")
+    client.cookies.set("triage_session", token_b)
+
+    # Tenant B detail attempt -> 404
+    r_detail_b = client.get(f"/browser-api/tickets/{ticket_a_id}")
+    assert r_detail_b.status_code == 404
+
+    # Tenant B ticket list does not contain Tenant A's ticket
+    r_list_b = client.get("/browser-api/tickets")
+    assert r_list_b.status_code == 200
+    ticket_ids_b = [t["id"] for t in r_list_b.json()["tickets"]]
+    assert ticket_a_id not in ticket_ids_b
