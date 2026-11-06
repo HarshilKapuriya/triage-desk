@@ -34,6 +34,24 @@ class TicketRecord:
     assignee_id: uuid.UUID | None
 
 
+@dataclass(frozen=True)
+class TicketListItem:
+    """Read-only view of a ticket list row with prediction metadata."""
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    external_id: str | None
+    subject: str
+    body: str
+    customer_email: str | None
+    status: str
+    category: str | None
+    priority: str | None
+    created_at: datetime
+    predicted_label: str | None
+    model_name: str | None
+    model_version: str | None
+
+
 def _row_to_ticket(row: dict[str, Any]) -> TicketRecord:
     """Convert a database row dict to TicketRecord."""
     return TicketRecord(
@@ -164,4 +182,58 @@ def get_ticket_by_id(
         if not row:
             return None
         return _row_to_ticket(row)
+
+
+def count_tickets(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+) -> int:
+    """Return total count of tickets for tenant_id."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM tickets WHERE tenant_id = %s;", (tenant_id,))
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+
+
+def list_tickets_with_prediction(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[TicketListItem]:
+    """List tickets with optional prediction metadata, strictly scoped to tenant_id."""
+    query = """
+        SELECT t.id, t.tenant_id, t.external_id, t.subject, t.body, t.customer_email,
+               t.status, t.category, t.priority, t.created_at,
+               p.predicted_label, m.name AS model_name, m.version AS model_version
+        FROM tickets t
+        LEFT JOIN ticket_predictions p
+          ON t.id = p.ticket_id AND t.tenant_id = p.tenant_id AND p.task = 'category'
+        LEFT JOIN model_versions m
+          ON p.model_version_id = m.id AND p.tenant_id = m.tenant_id
+        WHERE t.tenant_id = %s
+        ORDER BY t.created_at DESC, t.id DESC
+        LIMIT %s OFFSET %s;
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query, (tenant_id, limit, offset))
+        rows = cur.fetchall()
+        return [
+            TicketListItem(
+                id=uuid.UUID(str(r["id"])),
+                tenant_id=uuid.UUID(str(r["tenant_id"])),
+                external_id=r["external_id"],
+                subject=r["subject"],
+                body=r["body"],
+                customer_email=r["customer_email"],
+                status=r["status"],
+                category=r["category"],
+                priority=r["priority"],
+                created_at=r["created_at"],
+                predicted_label=r["predicted_label"],
+                model_name=r["model_name"],
+                model_version=r["model_version"],
+            )
+            for r in rows
+        ]
 

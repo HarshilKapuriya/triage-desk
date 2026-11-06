@@ -49,6 +49,24 @@ class PredictionRecord:
     created_at: datetime
 
 
+@dataclass(frozen=True)
+class TicketPredictionWithModel:
+    """Prediction joined with model version metadata."""
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    ticket_id: uuid.UUID
+    model_version_id: uuid.UUID
+    task: str
+    predicted_label: str
+    confidence: float | None
+    probabilities: dict[str, float] | None
+    decision_scores: dict[str, float] | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    model_name: str
+    model_version: str
+
+
 def _row_to_model_version(row: dict[str, Any]) -> ModelVersionRecord:
     classes_val = row["classes"]
     if isinstance(classes_val, str):
@@ -257,4 +275,54 @@ def get_predictions_for_ticket(
         cur.execute(query, (tenant_id, ticket_id))
         rows = cur.fetchall()
         return [_row_to_prediction(r) for r in rows]
+
+
+def get_prediction_with_model_for_ticket(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    task: str = "category",
+) -> TicketPredictionWithModel | None:
+    """Retrieve prediction joined with model version for a ticket, strictly tenant-scoped."""
+    query = """
+        SELECT p.id, p.tenant_id, p.ticket_id, p.model_version_id, p.task,
+               p.predicted_label, p.confidence, p.probabilities, p.decision_scores,
+               p.metadata, p.created_at,
+               m.name AS model_name, m.version AS model_version
+        FROM ticket_predictions p
+        JOIN model_versions m
+          ON p.model_version_id = m.id AND p.tenant_id = m.tenant_id
+        WHERE p.tenant_id = %s AND p.ticket_id = %s AND p.task = %s
+        ORDER BY p.created_at DESC
+        LIMIT 1;
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query, (tenant_id, ticket_id, task))
+        row = cur.fetchone()
+        if not row:
+            return None
+        probs = row["probabilities"]
+        if isinstance(probs, str):
+            probs = json.loads(probs)
+        scores = row["decision_scores"]
+        if isinstance(scores, str):
+            scores = json.loads(scores)
+        meta = row["metadata"]
+        if isinstance(meta, str):
+            meta = json.loads(meta)
+        return TicketPredictionWithModel(
+            id=uuid.UUID(str(row["id"])),
+            tenant_id=uuid.UUID(str(row["tenant_id"])),
+            ticket_id=uuid.UUID(str(row["ticket_id"])),
+            model_version_id=uuid.UUID(str(row["model_version_id"])),
+            task=row["task"],
+            predicted_label=row["predicted_label"],
+            confidence=float(row["confidence"]) if row["confidence"] is not None else None,
+            probabilities=probs,
+            decision_scores=scores,
+            metadata=meta,
+            created_at=row["created_at"],
+            model_name=row["model_name"],
+            model_version=row["model_version"],
+        )
 

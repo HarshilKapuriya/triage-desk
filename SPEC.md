@@ -31,7 +31,7 @@ MVP features: tenant signup and login, API keys, ticket ingestion (API and CSV),
 | Auth | Own implementation: argon2-cffi password hashes, PyJWT (HS256) tokens for dashboard users, hashed API keys for ingestion |
 | ML | scikit-learn, LightGBM, sentence-transformers `all-MiniLM-L6-v2` (phase 3 onward) |
 | Reply drafting | Hosted LLM API (Gemini or Groq free tier) behind a provider interface. Optional (phase 4) |
-| Frontend | Server-rendered Jinja2 templates with HTMX and Chart.js (phase 5). No UI in phase 1 |
+| Frontend | React + Vite + TypeScript communicating via dedicated /browser-api/* JSON endpoints with HttpOnly session cookies and session-bound CSRF protection, built into static assets served directly by FastAPI (phase 5 prototype brought forward). |
 | Tests and CI | pytest, GitHub Actions |
 
 ## 4. Repository layout (proposed, change it if you prefer)
@@ -47,7 +47,7 @@ app/
   routers/           auth.py, api_keys.py, tickets.py, health.py
   worker/            (phase 2)
   ml/                (phase 3 onward)
-  templates/         (phase 5)
+frontend/            (React + Vite + TypeScript application)
 migrations/          001_init.sql, 002_...
 scripts/migrate.py
 tests/
@@ -115,6 +115,28 @@ Details:
 - **A revoked key** returns `401`. Update `last_used_at` when a key is used.
 - **Ticket creation in phase 1** only stores the ticket. The `202` status is kept now so the contract does not change when phase 2 adds the queue and worker.
 - A small dependency in `deps.py` resolves every request to a `Principal(tenant_id, kind, id, role)` where `kind` is `user` or `api_key`. Routers use only `principal.tenant_id`.
+
+### 7.1 Browser API & Frontend Architecture (Phase 5 Brought Forward)
+
+Dedicated JSON endpoints under `/browser-api/*` serve the React + Vite + TypeScript single-page application:
+
+| Endpoint | Method | Auth & CSRF | Purpose |
+| --- | --- | --- | --- |
+| `/browser-api/csrf-token` | GET | None (anonymous pre-session or active session) | Issues signed CSRF token bound to session cookie |
+| `/browser-api/auth/login` | POST | Pre-login CSRF token validated | Authenticates user; sets HttpOnly `triage_session` cookie; returns user profile and refreshed authenticated CSRF token (JWT excluded from body) |
+| `/browser-api/auth/logout` | POST | `triage_session` + Authenticated CSRF token | Clears `triage_session` cookie; returns `{"status": "ok"}` |
+| `/browser-api/auth/session` | GET | `triage_session` | Returns active user session metadata and refreshed CSRF token |
+| `/browser-api/tickets` | GET | `triage_session` | Returns tenant-isolated paginated ticket list (`page >= 1`, `1 <= per_page <= 100`) with model prediction summaries |
+| `/browser-api/tickets` | POST | `triage_session` + Authenticated CSRF token | Creates tenant-owned ticket and enqueues background classification job (subject and body only; returns 201) |
+| `/browser-api/tickets/{id}` | GET | `triage_session` | Returns tenant-isolated ticket detail, full body, model prediction, uncalibrated decision scores, `Confidence unavailable`, and domain notice |
+
+Security and Architectural Rules:
+- **Ticket Submission**: `POST /browser-api/tickets` allows authenticated users to submit complaints directly from the browser UI. Subject (1-300 chars) and complaint body (1-20,000 chars) are required. Tenant identity is strictly derived from the verified session principal; client-supplied tenant identifiers cannot control ownership. Predictions are performed asynchronously by the background worker, never synchronously in the HTTP request.
+- **Cookie Security**: `triage_session` uses `HttpOnly`, `SameSite=Lax`, `Path=/`, explicit `Secure` flag (disabled for local development via `COOKIE_SECURE=false`, enabled for production), with `Max-Age` derived directly from configured `JWT_EXPIRE_MINUTES * 60`.
+- **CSRF Protection**: All state-changing browser requests require signed, session-bound CSRF tokens validated via constant-time comparison. Unauthenticated/pre-login actions bind to `pre_login_session`; authenticated actions bind to `triage_session`. Failed validation returns HTTP `403 Forbidden` (`{"error": {"code": "csrf_forbidden", ...}}`).
+- **Raw Request Body Bound**: Enforces 32 KiB raw request-body limit via chunked byte counting before JSON deserialization. Exceeding requests return HTTP `413 Content Too Large` with `Cache-Control: no-store`.
+- **Header Standard**: All `/browser-api/*` responses include `Cache-Control: no-store`.
+- **SPA Routing**: Production static build assets from `frontend/dist` are served by FastAPI. Unknown `/v1/*`, `/browser-api/*`, and `/assets/*` routes return HTTP `404 Not Found` JSON, never SPA HTML fallback.
 
 ## 8. Configuration
 

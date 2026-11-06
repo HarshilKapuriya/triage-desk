@@ -41,6 +41,13 @@ class Settings(BaseSettings):
         description="Lifetime of dashboard JWT access tokens in minutes.",
     )
 
+    # Browser UI cookie security settings
+    cookie_secure: bool = Field(
+        default=False,
+        alias="COOKIE_SECURE",
+        description="Whether to set Secure flag on browser cookies (enable in HTTPS/production).",
+    )
+
     # Database connection pool settings
     db_pool_min_size: int = Field(
         default=1,

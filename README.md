@@ -47,39 +47,159 @@ Required environment variables in `.env`:
 
 > **Important**: Never commit `.env` or print secret connection strings to logs or chat.
 
-### 4. Running Migrations
+### 4. Database Migrations
 
-Apply database migrations:
+#### Standard Migration Procedure (Fresh Databases & CI)
+The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`), managed by `scripts/migrate.py`.
 
+To apply all pending migrations on a new database:
 ```powershell
 python scripts/migrate.py
 ```
+`scripts/migrate.py` automatically provisions the `schema_migrations` tracking table if missing, scans `migrations/*.sql` in alphanumeric order, executes each pending migration within a transaction, and records the applied version.
 
-### 5. Running the API Server
+#### Historical Development Database Reconciliation Note
+*Distinction from standard migrations*: In the existing development database (`DATABASE_URL`), tables for `001_init.sql`, `002_jobs.sql`, and `003_ml_predictions.sql` had previously been introduced prior to establishing the migration runner. A one-time SQL reconciliation was executed directly on `DATABASE_URL` to create `schema_migrations` and record `001_init.sql`, `002_jobs.sql`, and `003_ml_predictions.sql` as applied without re-running DDL. This was a one-time environment reconciliation, distinct from repository migration files and distinct from the standard fresh-database migration procedure above.
 
-Start the FastAPI application with Uvicorn:
+### 5. Three-Terminal Startup Procedure
+
+To run the complete platform locally with live background inference and the React browser interface, open three separate PowerShell terminal windows:
+
+#### Terminal 1: FastAPI API Server
+Start the Uvicorn server bound to `127.0.0.1:8000`:
+```powershell
+cd triage-desk
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+- **Liveness probe**: `GET http://127.0.0.1:8000/healthz` -> `{"status": "ok"}`
+- **Interactive API Docs (Swagger)**: `http://127.0.0.1:8000/docs`
+- **React SPA (built static bundle)**: `http://127.0.0.1:8000/`
+
+#### Terminal 2: Background Queue Worker Process
+Start the standalone queue worker process:
+```powershell
+cd triage-desk
+.\.venv\Scripts\python.exe -m app.worker.main
+```
+- Standalone queue worker polling `jobs` using `SELECT ... FOR UPDATE SKIP LOCKED` (default 1.0s interval).
+- Loads and verifies trusted LinearSVC model (`run_004`) once on process startup.
+- Claims queued tickets, executes narrative inference, registers model version, stores prediction in `ticket_predictions`, and transitions ticket from `new` to `open`.
+- Graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM. Optional flags: `--poll-interval <sec>`, `--lease-seconds <sec>`.
+
+#### Terminal 3: React Frontend (Vite Development Server)
+Start the Vite development server with strict port binding:
+```powershell
+cd triage-desk\frontend
+npm run dev -- --port 5173 --strictPort
+```
+- Vite dev server runs at `http://127.0.0.1:5173`.
+- **Proxy Configuration**: As defined in `frontend/vite.config.ts`, Vite proxies `/browser-api` requests directly to `http://127.0.0.1:8000` with `changeOrigin: true`.
+- Alternatively, production assets compiled via `npm run build` into `frontend/dist` are served directly by FastAPI at `http://127.0.0.1:8000` without requiring a Node process in production.
+
+---
+
+### 6. Authentication & Demo-Ticket Submission
+
+Use a separate, temporary PowerShell window to authenticate, create an ingestion API key, and submit demo tickets.
+
+> **Security Note on Shell Credentials**: Setting variables to `$null` does not guarantee memory sanitization in PowerShell because intermediate response/pipeline objects retain credential data. **Close the temporary ingestion PowerShell window when finished** to guarantee all credentials and in-memory variables are fully purged.
+
+---
+
+#### Option A: Existing User Login (Recommended)
+If your demo account (`demo.agent@example.com`) is already registered, authenticate via `POST /v1/auth/login` to obtain your admin JWT:
 
 ```powershell
-python -m uvicorn app.main:app --reload --port 8000
+# Retrieve password securely via masked prompt
+$plainPwd = [System.Net.NetworkCredential]::new("", (Read-Host "Enter password for demo.agent@example.com" -AsSecureString)).Password
+
+$loginPayload = @{
+    email    = 'demo.agent@example.com'
+    password = $plainPwd
+} | ConvertTo-Json
+
+$loginResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/auth/login" `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $loginPayload
+
+$jwtToken = $loginResp.access_token
+Write-Host "Authenticated successfully with existing account."
 ```
 
-Once running:
-- **Liveness probe**: `GET http://localhost:8000/healthz` -> `{"status": "ok"}`
-- **Interactive API Docs (Swagger)**: `http://localhost:8000/docs`
+---
 
-### 6. Running the Background Worker Process
-
-The queue worker runs as a separate standalone daemon process, polling the `jobs` table using `SELECT ... FOR UPDATE SKIP LOCKED` without busy-waiting:
+#### Option B: First-Time Tenant Signup (New Companies Only)
+> **Warning**: Do not run this if your demo account already exists. Re-registering an existing email will fail with HTTP 409 Conflict. Run this only when onboarding a brand-new tenant:
 
 ```powershell
-python -m app.worker.main
+$plainPwd = [System.Net.NetworkCredential]::new("", (Read-Host "Enter admin password (min 8 characters)" -AsSecureString)).Password
+
+$signupPayload = @{
+    company_name = 'Demo Bank Corporation'
+    email        = 'new.tenant.admin@example.com'
+    password     = $plainPwd
+} | ConvertTo-Json
+
+$signupResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/auth/signup" `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $signupPayload
+
+$jwtToken = $signupResp.access_token
+Write-Host "Registered Tenant ID: $($signupResp.tenant_id), User ID: $($signupResp.user_id)"
 ```
 
-Optional CLI arguments:
-- `--poll-interval <seconds>`: Sleep duration when the queue is empty (default: 1.0s). Cleanly interrupted on signal.
-- `--lease-seconds <seconds>`: Worker lease duration before an unrenewed job is considered abandoned (default: 300s).
+---
 
-The worker handles graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM, automatically performs periodic stale job recovery sweeps, and schedules retries with exponential backoff. On startup, the worker loads and validates the trusted ML model artifact once per process.
+#### Provision Ingestion API Key (Admin JWT Required)
+With your `$jwtToken` from Option A or B, provision an API key for ticket ingestion:
+
+```powershell
+$keyPayload = @{ label = 'demo-ingest-key' } | ConvertTo-Json
+$keyResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/api-keys" `
+    -Method Post `
+    -Headers @{ Authorization = "Bearer $jwtToken" } `
+    -ContentType "application/json" `
+    -Body $keyPayload
+
+$apiKey = $keyResp.key
+Write-Host "Provisioned API Key in memory."
+```
+
+---
+
+#### Ingest Synthetic Financial Complaint Ticket
+> **Important**: In PowerShell, literal strings containing dollar signs (such as `$1,200` and `$105`) must be enclosed in single quotes (`'...'`). Double quotes will cause PowerShell to evaluate `$1` and `$105` as variables, corrupting the complaint text.
+
+This sample narrative is a **synthetic financial complaint** constructed to exercise the checking account overdraft triage path:
+
+```powershell
+# Use single quotes for text containing literal currency signs ($1,200, $105)
+$complaint = @{
+    subject     = 'Dispute over uncredited checking account deposit and overdraft fees'
+    body        = 'I deposited a check for $1,200 into my personal checking account at the branch ATM on Monday. The teller stated funds would be available immediately, but the bank placed an extended hold without providing an exception hold notice. As a result, three routine household utility bills bounced, and the bank assessed $105 in non-sufficient funds (NSF) overdraft fees against my account.'
+    external_id = 'synthetic-cfpb-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+} | ConvertTo-Json
+
+$ticketResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/tickets" `
+    -Method Post `
+    -Headers @{ "X-API-Key" = $apiKey } `
+    -ContentType "application/json" `
+    -Body $complaint
+
+Write-Host "Ingested Ticket: $($ticketResp.id) [Status: $($ticketResp.status)]"
+Write-Host "Close this PowerShell window when finished to purge credentials from memory."
+```
+
+---
+
+#### View in React Frontend
+1. Open browser to `http://127.0.0.1:5173/login` (or `http://127.0.0.1:8000/login`).
+2. Log in with registered email (`demo.agent@example.com`) and password.
+3. Observe ticket transitioning from `new` to `open` as the worker completes inference.
+4. Click ticket row to inspect predicted category (`Checking or savings account`), model version (`run_004`), decision margins, and domain limitations.
+5. Close the temporary ingestion PowerShell window.
 
 ---
 
@@ -199,5 +319,22 @@ python -m pytest tests/test_isolation.py -v
 >
 > In GitHub Actions CI (`.github/workflows/ci.yml`), a dedicated PostgreSQL 16 service container is configured to provision automatically, apply migrations using `scripts/migrate.py`, and run the full test suite against the throwaway CI database.
 >
-> **Current CI Status & Temporary Phase-Gate Exception**: GitHub CI is currently blocked before execution due to an account-level billing lock ("The job was not started because your account is locked due to a billing issue"). Under an approved temporary phase-gate exception, passing all local PostgreSQL tests against the separate `TEST_DATABASE_URL` gates development, while GitHub CI verification remains an explicitly outstanding requirement.
+> **Current CI Status & Temporary Phase-Gate Exception**: GitHub Actions CI status remains unverified on GitHub remote runners due to an observed account billing block preventing workflow execution ("The job was not started because your account is locked due to a billing issue"). Under an approved temporary phase-gate exception, passing all local PostgreSQL tests against the separate `TEST_DATABASE_URL` gates development, while remote GitHub Actions verification remains explicitly unverified and outstanding.
+
+---
+
+## Verification & Testing Record
+
+### 1. Automated Test Suite (FastAPI, Pytest & TypeScript)
+- **Pytest Suite (`pytest -q`)**: 124 passed, 0 failed, 1 Starlette deprecation warning (`Using 'httpx' with 'starlette.testclient' is deprecated; install 'httpx2' instead.`, recorded separately).
+- **TypeScript Static Verification (`npx tsc --noEmit`)**: 0 type errors.
+- **Production Bundle Build (`npm run build`)**: Built cleanly into `frontend/dist/`.
+
+### 2. Manual Browser Smoke Test Record (2026-11-06)
+*Conducted by the user in a live browser session against origin `http://localhost:5173`, clearly separated from automated test runs:*
+- **Login Flow**: User successfully authenticated at `http://localhost:5173/login` using registered demo tenant credentials (`demo.agent@example.com`); received HttpOnly session cookie and navigated to `/tickets`.
+- **New Ticket Submission**: User clicked "+ New Ticket" on the ticket queue view, entered subject and complaint narrative, verified character counts and domain notice, and submitted the form.
+- **Immediate Navigation**: Form disabled repeated clicks during submission and routed to the created ticket detail page (`/tickets/{id}`).
+- **Queue & Worker Processing**: The background queue worker claimed the job, executed inference using the loaded `run_004` LinearSVC model, and committed the prediction.
+- **Live React Prediction Display**: The ticket detail page rendered the submitted ticket body, predicted category (`Checking or savings account`), model version (`run_004`), `Confidence unavailable` label, and raw decision margin scores.
 

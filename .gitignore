@@ -33,4 +33,9 @@ experiments/models/
 *.joblib
 *.pkl
 
+# Node & Frontend build artifacts
+node_modules/
+dist/
+.vite/
+
 

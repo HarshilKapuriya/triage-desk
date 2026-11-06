@@ -5,7 +5,9 @@ Never log passwords, hashes, tokens, or plaintext API keys.
 
 from datetime import datetime, timezone, timedelta
 import hashlib
+import hmac
 import secrets
+import time
 from typing import Any
 import uuid
 
@@ -190,4 +192,76 @@ def hash_api_key(key: str) -> str:
     if not isinstance(key, str) or not key:
         raise ValueError("API key must be a non-empty string.")
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# 4. Browser CSRF & Session Binding Utilities
+# ---------------------------------------------------------------------------
+
+def derive_session_identifier(raw_session_token: str) -> str:
+    """Derive an opaque session identifier from a session token or pre-login token.
+
+    Uses HMAC-SHA256 with the server's secret key so the raw token (such as a JWT)
+    is never exposed in CSRF tokens or logs.
+    """
+    if not isinstance(raw_session_token, str) or not raw_session_token:
+        raise ValueError("Session token must be a non-empty string.")
+
+    settings = get_settings()
+    secret = settings.jwt_secret.get_secret_value().encode("utf-8")
+    msg = f"session_binding:{raw_session_token}".encode("utf-8")
+    return hmac.new(secret, msg, hashlib.sha256).hexdigest()
+
+
+def generate_csrf_token(session_id: str) -> str:
+    """Generate a signed, session-bound CSRF token.
+
+    Format: {timestamp}.{nonce}.{signature}
+    """
+    if not isinstance(session_id, str) or not session_id:
+        raise ValueError("session_id must be a non-empty string.")
+
+    settings = get_settings()
+    secret = settings.jwt_secret.get_secret_value().encode("utf-8")
+    ts = int(time.time())
+    nonce = secrets.token_hex(16)
+    msg = f"{session_id}:{ts}:{nonce}".encode("utf-8")
+    sig = hmac.new(secret, msg, hashlib.sha256).hexdigest()
+    return f"{ts}.{nonce}.{sig}"
+
+
+def verify_csrf_token(csrf_token: str, session_id: str, max_age_seconds: int = 3600) -> bool:
+    """Verify a signed, session-bound CSRF token in constant time.
+
+    Returns True if valid, False if invalid, expired, malformed, or mismatched.
+    """
+    if not isinstance(csrf_token, str) or not isinstance(session_id, str):
+        return False
+    if not csrf_token or not session_id:
+        return False
+
+    parts = csrf_token.split(".")
+    if len(parts) != 3:
+        return False
+
+    ts_str, nonce, sig = parts
+    try:
+        ts = int(ts_str)
+    except (ValueError, TypeError):
+        return False
+
+    now = time.time()
+    # Reject expired tokens or tokens with timestamps more than 60s in the future
+    if (now - ts) > max_age_seconds or (ts - now) > 60:
+        return False
+
+    if not nonce or not sig:
+        return False
+
+    settings = get_settings()
+    secret = settings.jwt_secret.get_secret_value().encode("utf-8")
+    msg = f"{session_id}:{ts_str}:{nonce}".encode("utf-8")
+    expected_sig = hmac.new(secret, msg, hashlib.sha256).hexdigest()
+
+    return hmac.compare_digest(sig, expected_sig)
 
