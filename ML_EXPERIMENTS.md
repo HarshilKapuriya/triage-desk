@@ -9,8 +9,8 @@ This document records the Phase 3 exploration, dataset audits, baseline comparis
 * **Prediction Domain**: **Financial-product complaint classification**, trained on real Consumer Financial Protection Bureau (CFPB) complaint narratives.
 * **Non-Goals / Scope Restrictions**:
   * This model classifies financial product lines (`Credit reporting`, `Debt collection`, `Credit card`, `Mortgage`, etc.). It does **not** classify internal helpdesk categories (`Billing`, `Technical Issue`, `Account`, `Shipping`).
-  * **Priority classification remains unresolved**: CFPB complaints do not possess operational priority labels (e.g. `urgent`, `high`, `normal`, `low`). No priority labels were inferred, generated, or assigned.
-  * No model binaries are integrated into the FastAPI service, worker loop, or database schema yet.
+  * **Priority classification remains unresolved**: CFPB complaints do not possess operational priority labels (e.g. `urgent`, `high`, `normal`, `low`). No priority labels were inferred, generated, or assigned. Priority prediction remains explicitly deferred.
+  * **Integration Scope**: The frozen LinearSVC model from `run_004` is integrated as a financial complaint triage demo via `model_versions`, `ticket_predictions`, the background worker (`app/worker/handler.py`), and `GET /v1/tickets/{id}`. No dashboard UI is included.
 
 ---
 
@@ -147,5 +147,21 @@ Comparing the unweighted winner against `class_weight='balanced', C=0.1` demonst
   * `experiments/runs/run_002_reconciled/`
   * `experiments/runs/run_003_cfpb_jan2024/`
   * `experiments/runs/run_004_cfpb_imbalance_tuning/`
-* **Regression Suite Status**: **97 passed, 0 failed, 0 skipped, 1 warning** across 14 test modules in 194.37s.
+* **Regression Suite Status**: **105 passed, 0 failed, 0 skipped, 1 warning** across 15 test modules in 225.55s.
+
+---
+
+## 8. Worker Pipeline Integration & Demo
+
+* **Integrated Components**:
+  * **Model Loader**: [`app/ml/loader.py`](file:///C:/Users/91931/OneDrive/Desktop/Major%20Project/Ticket%20Intelligence%20Platform/triage-desk/app/ml/loader.py) preloads and caches the trusted local artifact once per worker process.
+  * **Expected SHA-256 Digest**: `7e833e8992a3150bdaf2489b9b9117d700f7875e9dde045e4f638bd1e656b360`.
+  * **Required Dependencies**: Python 3.11+, `scikit-learn==1.9.1`, `numpy==2.5.4`, `scipy==1.18.1`, `joblib==1.6.0` (as declared in `requirements.txt`).
+  * **Provisioning Notice**: Retraining via `scripts/tune_cfpb_imbalance.py` reproduces hyperparameters and splits, but platform/compiler build differences do not guarantee a bit-for-bit identical binary file hash. Environments should provision the exact verified artifact matching the SHA-256 digest above.
+  * **Worker Inference**: Evaluates `ticket.body` strictly (narrative text). Missing or corrupted artifacts raise explicit operational errors (`ModelArtifactMissingError`, `ModelArtifactCorruptedError`) and requeue/fail the job without fabricating predictions.
+  * **Schema & Multi-Tenancy**: `migrations/003_ml_predictions.sql` defines `model_versions` and `ticket_predictions` with composite foreign keys enforcing multi-tenant isolation. Each tenant has an explicit active row in `model_versions` (`tenant_id NOT NULL`) without global-tenant bypasses.
+  * **Scores vs. Probabilities**: LinearSVC margin distances are uncalibrated; `confidence` is left strictly `NULL`, and raw margin scores are stored in `decision_scores JSONB`.
+  * **Priority Status**: Priority prediction remains explicitly deferred.
+  * **Integration Tests**: [`tests/test_ml_integration_db.py`](file:///C:/Users/91931/OneDrive/Desktop/Major%20Project/Ticket%20Intelligence%20Platform/triage-desk/tests/test_ml_integration_db.py) (8 tests covering valid labels, detail endpoint exposure, tenant isolation, retry idempotency, stale claim rollback, and missing/corrupt artifact handling).
+  * **CI Status**: GitHub Actions CI remains marked blocked due to the outstanding repository billing lock; gated via local test execution against `TEST_DATABASE_URL`.
 

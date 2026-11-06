@@ -12,6 +12,8 @@ from typing import Any
 import uuid
 import psycopg
 from psycopg.rows import dict_row
+import app.repositories.ml as ml_repo
+
 
 
 @dataclass(frozen=True)
@@ -242,6 +244,12 @@ def complete_job_with_ticket_transition(
     worker_id: str,
     generation: int,
     lease_seconds: int = 300,
+    model_version_id: uuid.UUID | None = None,
+    task: str | None = None,
+    predicted_label: str | None = None,
+    confidence: float | None = None,
+    decision_scores: dict[str, float] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> bool:
     """Atomically validate claim, apply ticket state transition and audit log, and complete job.
 
@@ -268,7 +276,21 @@ def complete_job_with_ticket_transition(
         if cur.rowcount == 0:
             raise StaleClaimError("Cannot complete job: active lease expired or generation mismatch.")
 
-    # 2. Lock and inspect ticket status
+    # 2. Persist ML prediction atomically if provided (idempotent under retries)
+    if model_version_id is not None and task is not None and predicted_label is not None:
+        ml_repo.save_ticket_prediction(
+            conn=conn,
+            tenant_id=tenant_id,
+            ticket_id=ticket_id,
+            model_version_id=model_version_id,
+            task=task,
+            predicted_label=predicted_label,
+            confidence=confidence,
+            decision_scores=decision_scores,
+            metadata=metadata,
+        )
+
+    # 3. Lock and inspect ticket status
     actor = f"worker:{worker_id}"
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(

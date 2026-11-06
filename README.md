@@ -79,7 +79,28 @@ Optional CLI arguments:
 - `--poll-interval <seconds>`: Sleep duration when the queue is empty (default: 1.0s). Cleanly interrupted on signal.
 - `--lease-seconds <seconds>`: Worker lease duration before an unrenewed job is considered abandoned (default: 300s).
 
-The worker handles graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM, automatically performs periodic stale job recovery sweeps, and schedules retries with exponential backoff.
+The worker handles graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM, automatically performs periodic stale job recovery sweeps, and schedules retries with exponential backoff. On startup, the worker loads and validates the trusted ML model artifact once per process.
+
+---
+
+## Phase 3 ML Model Integration (Financial Complaint Demo)
+
+Triage Desk incorporates a CPU-only text classification pipeline for automated ticket triage. In Phase 3, this is demonstrated using a real-world financial consumer complaint classifier trained on official CFPB narratives:
+
+- **Target Domain**: Financial product classification across 11 CFPB classes (`Checking or savings account`, `Credit card`, `Credit reporting or other personal consumer reports`, `Debt collection`, `Debt or credit management`, `Money transfer, virtual currency, or money service`, `Mortgage`, `Payday loan, title loan, personal loan, or advance loan`, `Prepaid card`, `Student loan`, `Vehicle loan or lease`).
+- **Domain Limitation Notice**: The model is trained exclusively on financial consumer complaint narratives. It has no out-of-domain detection mechanism; non-financial support tickets (e.g., IT hardware, password resets) will receive an arbitrary financial product label.
+- **Model Architecture**: Frozen TF-IDF (1-2 ngrams, sublinear TF, 25k features) + LinearSVC ($C=1.0$, `class_weight=None`) from `run_004`.
+- **Confidence & Decision Scores**: LinearSVC decision scores are hyperplane margin distances, not probabilities. Margin distances and softmax transformations of margins are not calibrated probabilities. Therefore, `confidence` is left strictly `NULL` in `ticket_predictions` and API responses, while raw margins are preserved under `decision_scores`.
+- **Priority Status**: Priority prediction remains explicitly deferred; priority is not populated with heuristics or uncalibrated predictions.
+- **Multi-Tenant Isolation**: Every tenant maintains its own explicit record in `model_versions` (`tenant_id NOT NULL`), and `ticket_predictions` enforces composite foreign keys `(tenant_id, ticket_id)` and `(tenant_id, model_version_id)` preventing cross-tenant visibility or tampering. Predictions are distinguished from human-curated ticket attributes (`tickets.category` remains untouched).
+- **Artifact Provisioning & Integrity**:
+  - Expected SHA-256 Digest: `7e833e8992a3150bdaf2489b9b9117d700f7875e9dde045e4f638bd1e656b360`.
+  - Required Environment & Dependencies: Python 3.11+, `scikit-learn==1.9.1`, `numpy==2.5.4`, `scipy==1.18.1`, `joblib==1.6.0` (as specified in `requirements.txt`).
+  - Default Location: `experiments/runs/run_004_cfpb_imbalance_tuning/models/selected_cw_None_C_1.0.joblib`.
+  - Configurable Override: `MODEL_ARTIFACT_PATH` environment variable.
+  - Provisioning Steps: Provision the verified, trusted artifact matching the expected SHA-256 digest at the default path or at the path designated by `MODEL_ARTIFACT_PATH`.
+  - Reproducibility & Binary Hash Notice: Running `python scripts/tune_cfpb_imbalance.py` reproduces the training pipeline, hyperparameters, and split configuration, but retraining across different OS environments, CPU architectures, or library builds is not guaranteed to reproduce a bit-for-bit identical serialized `.joblib` file hash. Production/worker runtimes should provision the exact verified artifact matching the SHA-256 digest above.
+  - Missing or corrupted artifacts raise explicit operational errors (`ModelArtifactMissingError`, `ModelArtifactCorruptedError`) and requeue/fail the worker job without fabricating predictions.
 
 ---
 

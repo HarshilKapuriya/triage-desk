@@ -110,6 +110,14 @@ class WorkerService:
         """Run worker loop until stopped."""
         logger.info(f"Worker {self.worker_id} started. Poll interval: {self.poll_interval}s.")
 
+        # Preload trusted model artifact once per worker process
+        try:
+            from app.ml.loader import get_model_manager
+            get_model_manager().load_model()
+            logger.info("Trusted ML model loaded and verified once on worker process startup.")
+        except Exception as exc:
+            logger.warning(f"Could not preload model artifact on worker start (will retry on job): {exc}")
+
         with psycopg.connect(self.db_url, autocommit=True) as conn:
             while not self._stop_event.is_set():
                 result = self.run_one_cycle(conn)

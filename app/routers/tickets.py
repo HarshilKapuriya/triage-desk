@@ -26,6 +26,7 @@ from app.db import get_connection
 from app.deps import Principal, get_api_key_principal, get_any_principal
 import app.repositories.tickets as ticket_repo
 import app.repositories.jobs as job_repo
+import app.repositories.ml as ml_repo
 
 router = APIRouter(prefix="/v1/tickets", tags=["Tickets"])
 
@@ -47,6 +48,19 @@ class CreateTicketRequest(BaseModel):
         return v
 
 
+class PredictionResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ticket_id: str
+    model_version_id: str
+    task: str
+    predicted_label: str
+    confidence: float | None = None
+    probabilities: dict[str, float] | None = None
+    decision_scores: dict[str, float] | None = None
+    created_at: datetime
+
+
 class TicketResponse(BaseModel):
     id: str
     tenant_id: str
@@ -61,10 +75,32 @@ class TicketResponse(BaseModel):
     first_response_at: datetime | None = None
     resolved_at: datetime | None = None
     assignee_id: str | None = None
+    predictions: list[PredictionResponse] = Field(default_factory=list)
 
 
-def _to_response_model(record: ticket_repo.TicketRecord) -> TicketResponse:
-    """Helper to convert TicketRecord to TicketResponse."""
+def _to_response_model(
+    record: ticket_repo.TicketRecord,
+    predictions: list[ml_repo.PredictionRecord] | None = None,
+) -> TicketResponse:
+    """Helper to convert TicketRecord and optional predictions to TicketResponse."""
+    pred_models: list[PredictionResponse] = []
+    if predictions:
+        for p in predictions:
+            pred_models.append(
+                PredictionResponse(
+                    id=str(p.id),
+                    tenant_id=str(p.tenant_id),
+                    ticket_id=str(p.ticket_id),
+                    model_version_id=str(p.model_version_id),
+                    task=p.task,
+                    predicted_label=p.predicted_label,
+                    confidence=p.confidence,
+                    probabilities=p.probabilities,
+                    decision_scores=p.decision_scores,
+                    created_at=p.created_at,
+                )
+            )
+
     return TicketResponse(
         id=str(record.id),
         tenant_id=str(record.tenant_id),
@@ -79,6 +115,7 @@ def _to_response_model(record: ticket_repo.TicketRecord) -> TicketResponse:
         first_response_at=record.first_response_at,
         resolved_at=record.resolved_at,
         assignee_id=str(record.assignee_id) if record.assignee_id else None,
+        predictions=pred_models,
     )
 
 
@@ -385,14 +422,20 @@ def get_ticket(
             ticket_id=parsed_id,
         )
 
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "code": "not_found",
-                "message": "Ticket not found.",
-            },
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "not_found",
+                    "message": "Ticket not found.",
+                },
+            )
+
+        predictions = ml_repo.get_predictions_for_ticket(
+            conn=conn,
+            tenant_id=principal.tenant_id,
+            ticket_id=parsed_id,
         )
 
-    return _to_response_model(record)
+    return _to_response_model(record, predictions=predictions)
 
