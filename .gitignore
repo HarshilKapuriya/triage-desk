@@ -32,6 +32,8 @@ models/
 experiments/models/
 *.joblib
 *.pkl
+*.onnx
+.tmp_download_*
 
 # Node & Frontend build artifacts
 node_modules/

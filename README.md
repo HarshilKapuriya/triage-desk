@@ -316,6 +316,9 @@ python -m pytest tests/test_security.py -v
 # Run only health unit tests
 python -m pytest tests/test_health.py -v
 
+# Run embedding adapter and provisioning unit tests (offline, fake tokenizer/session)
+python -m pytest tests/test_embedding_adapter.py -v
+
 # Run database integration tests (requires configured TEST_DATABASE_URL)
 python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py tests/test_duplicates_db.py -v
 
@@ -342,6 +345,10 @@ python -m pytest tests/test_isolation.py -v
 - **Processing Status Focused Integration Tests (`pytest tests/test_browser_ui.py -k "test_browser_processing_status" -v`)**: 9 passed, 0 failed (verifying all 6 queue pipeline states, retry delay handling, and raw error/worker ID sanitization).
 - **TypeScript Static Verification (`npx tsc --noEmit`)**: 0 type errors.
 - **Production Bundle Build (`npm run build`)**: Built cleanly into `frontend/dist/` in 1.03s.
+- **Phase 4 Embedding Adapter & Provisioning Tooling (`pytest tests/test_embedding_adapter.py -v`)**: 29 passed, 1 skipped, 0 failed.
+  - *Offline Test Coverage*: Verified text normalization, CRLF/CR newline normalization to LF, 4,000-character resource-bounding cap, 256-token subword truncation configuration, attention-mask-weighted mean pooling against mathematical test fixtures (zero weight on masked tokens), L2 vector unit normalization within tolerance, rejection of invalid inputs (empty masks, zero norms, NaN/infinities, non-3D tensors, wrong hidden dimensions), graph input/output type and 3D dimension inspection at load, manifest SHA-256 validation, full 40-character model revision in pipeline identity, and per-file atomic CLI downloader behavior (temporary-file streaming, size/digest verification, abort on oversized/truncated payloads, cleanup of temp files, and non-replacement of valid files).
+  - *Opt-In Real-Model Smoke Test*: 1 skipped (`test_real_embedding_model_smoke`), gated by `RUN_REAL_EMBEDDING_TESTS=true`. Contract verified separately: fails with clear message directing operator to provision weights if enabled without model artifacts, and skips cleanly when disabled.
+  - *Retained Execution Boundaries*: Real-model inference was not executed; artifact provisioning was not executed; worker integration was not implemented; duplicate-detection quality was not evaluated; and remote CI was last observed billing-blocked before execution.
 
 ### 2. Manual Browser Testing Record (2026-11-06)
 - **Ticket Submission Smoke Test (Conducted by User)**:
