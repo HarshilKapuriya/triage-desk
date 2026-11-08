@@ -16,6 +16,7 @@ import psycopg
 import app.repositories.jobs as job_repo
 import app.repositories.tickets as ticket_repo
 import app.repositories.ml as ml_repo
+import app.repositories.kb as kb_repo
 from app.ml.loader import (
     get_model_manager,
     TRUSTED_TASK,
@@ -255,5 +256,132 @@ def _process_ticket_embedding_job(
         except Exception as fail_exc:
             logger.error(
                 f"Worker {worker_id}: failed to record retry/failure for embedding job {job.id}: {fail_exc}"
+            )
+            return "error_recording_failure"
+
+
+def process_claimed_article_job(
+    conn: psycopg.Connection,
+    job: kb_repo.ArticleJobRecord,
+    worker_id: str,
+    lease_seconds: int = 300,
+    enable_embeddings: bool = False,
+    embedding_adapter: Any | None = None,
+) -> str:
+    """Process a single claimed article job based on its type.
+
+    Returns:
+        str: 'completed', 'requeued', 'failed', 'stale_claim', or 'unsupported_job_type'.
+    """
+    if job.type == "article_embedding":
+        return _process_article_embedding_job(
+            conn=conn,
+            job=job,
+            worker_id=worker_id,
+            lease_seconds=lease_seconds,
+            enable_embeddings=enable_embeddings,
+            embedding_adapter=embedding_adapter,
+        )
+    else:
+        logger.warning(f"Worker {worker_id}: unsupported article job type '{job.type}' for job {job.id}")
+        try:
+            with conn.transaction():
+                kb_repo.fail_or_retry_article_job(
+                    conn=conn,
+                    tenant_id=job.tenant_id,
+                    job_id=job.id,
+                    worker_id=worker_id,
+                    generation=job.attempts,
+                    error_message=f"unsupported_job_type: {job.type}",
+                    article_id=job.article_id,
+                )
+        except Exception as exc:
+            logger.error(f"Error recording failure for unsupported article job {job.id}: {exc}")
+        return "unsupported_job_type"
+
+
+def _process_article_embedding_job(
+    conn: psycopg.Connection,
+    job: kb_repo.ArticleJobRecord,
+    worker_id: str,
+    lease_seconds: int = 300,
+    enable_embeddings: bool = False,
+    embedding_adapter: Any | None = None,
+) -> str:
+    """Process article_embedding: embed all chunks and mark article ready."""
+    if not enable_embeddings:
+        logger.info(
+            f"Worker {worker_id}: embedding feature disabled; releasing article job {job.id} back to queued."
+        )
+        with conn.transaction():
+            kb_repo.release_claimed_article_job_to_queued(
+                conn=conn,
+                tenant_id=job.tenant_id,
+                job_id=job.id,
+                worker_id=worker_id,
+                generation=job.attempts,
+            )
+        return "requeued"
+
+    try:
+        # 1. Fetch chunks for article strictly scoped to tenant_id
+        chunks = kb_repo.get_kb_chunks_for_article(
+            conn=conn,
+            tenant_id=job.tenant_id,
+            article_id=job.article_id,
+        )
+        if not chunks:
+            raise RuntimeError(f"No chunks found for article {job.article_id} (tenant {job.tenant_id}).")
+
+        # 2. Resolve embedding adapter (or load lazily)
+        adapter = embedding_adapter
+        if adapter is None:
+            from app.ml.embeddings import EmbeddingModelAdapter
+            adapter = EmbeddingModelAdapter()
+
+        # 3. CPU tensor inference executed OUTSIDE database transactions without holding locks
+        chunk_embeddings: list[tuple[uuid.UUID, list[float], str, str]] = []
+        for chunk in chunks:
+            res = adapter.embed_text(chunk.content)
+            chunk_embeddings.append((chunk.id, res.vector, res.model_name, res.model_revision))
+
+        # 4. Atomic fenced completion and embedding persistence inside a short transaction
+        with conn.transaction():
+            kb_repo.complete_article_job(
+                conn=conn,
+                tenant_id=job.tenant_id,
+                job_id=job.id,
+                article_id=job.article_id,
+                worker_id=worker_id,
+                generation=job.attempts,
+                chunk_embeddings=chunk_embeddings,
+                lease_seconds=lease_seconds,
+            )
+        return "completed"
+
+    except kb_repo.StaleClaimError:
+        logger.warning(
+            f"Worker {worker_id}: lost claim or lease expired for article job {job.id} (gen {job.attempts})"
+        )
+        return "stale_claim"
+
+    except Exception as exc:
+        err_msg = f"{exc.__class__.__name__}: {str(exc)}"
+        logger.error(f"Worker {worker_id}: article embedding processing failed for job {job.id}: {err_msg}")
+        try:
+            with conn.transaction():
+                status = kb_repo.fail_or_retry_article_job(
+                    conn=conn,
+                    tenant_id=job.tenant_id,
+                    job_id=job.id,
+                    worker_id=worker_id,
+                    generation=job.attempts,
+                    error_message=err_msg,
+                    article_id=job.article_id,
+                )
+            return status
+        except Exception as fail_exc:
+            logger.error(
+                f"Worker {worker_id}: failed to record retry/failure for article job {job.id}: {fail_exc}"
             )
             return "error_recording_failure"

@@ -1,4 +1,13 @@
-import { User, TicketListItem, Pagination, TicketDetailResponse, SimilarTicketsResponse, SimilarFeedbackResponse } from './types';
+import {
+  User,
+  TicketListItem,
+  Pagination,
+  TicketDetailResponse,
+  SimilarTicketsResponse,
+  SimilarFeedbackResponse,
+  KBArticleSummary,
+  RelevantKnowledgeResponse,
+} from './types';
 
 class ApiClient {
   private csrfToken: string | null = null;
@@ -127,6 +136,28 @@ class ApiClient {
         body: JSON.stringify({ decision, csrf_token: this.csrfToken }),
       }
     );
+  }
+
+  async getKBArticles(): Promise<{ items: KBArticleSummary[] }> {
+    return this.request<{ items: KBArticleSummary[] }>('/browser-api/kb/articles');
+  }
+
+  async createKBArticle(title: string, body: string): Promise<{ id: string; title: string; status: string; chunk_count: number; created_at: string; notice: string }> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<{ id: string; title: string; status: string; chunk_count: number; created_at: string; notice: string }>(
+      '/browser-api/kb/articles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body, csrf_token: this.csrfToken }),
+      }
+    );
+  }
+
+  async getRelevantKnowledge(ticketId: string): Promise<RelevantKnowledgeResponse> {
+    return this.request<RelevantKnowledgeResponse>(`/browser-api/tickets/${ticketId}/relevant-knowledge`);
   }
 }
 

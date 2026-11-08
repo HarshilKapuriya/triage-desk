@@ -102,3 +102,33 @@ export interface SimilarTicketsResponse {
   notice: string;
   message?: string | null;
 }
+
+export interface KBArticleSummary {
+  id: string;
+  title: string;
+  status: 'processing' | 'ready' | 'failed' | string;
+  chunk_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RelevantKnowledgeItem {
+  chunk_id: string;
+  article_id: string;
+  article_title: string;
+  chunk_index: number;
+  excerpt: string;
+  char_count: number;
+  token_count: number;
+  similarity_score: number;
+}
+
+export interface RelevantKnowledgeResponse {
+  ticket_id: string;
+  status: 'ready' | 'missing_ticket_embedding' | 'articles_processing' | 'no_chunks_available' | string;
+  model_name: string | null;
+  model_version: string | null;
+  items: RelevantKnowledgeItem[];
+  notice: string;
+  message?: string | null;
+}

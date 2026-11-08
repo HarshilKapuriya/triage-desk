@@ -7,9 +7,10 @@ import { LoginView } from './components/LoginView';
 import { TicketsListView } from './components/TicketsListView';
 import { TicketDetailView } from './components/TicketDetailView';
 import { CreateTicketView } from './components/CreateTicketView';
+import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import './App.css';
 
-type ViewMode = 'login' | 'tickets' | 'ticket-detail' | 'new-ticket';
+type ViewMode = 'login' | 'tickets' | 'ticket-detail' | 'new-ticket' | 'knowledge-base';
 
 export const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -35,6 +36,11 @@ export const App = () => {
     if (path === '/tickets/new') {
       setSelectedTicketId(null);
       setView('new-ticket');
+      return;
+    }
+    if (path === '/kb' || path === '/knowledge-base') {
+      setSelectedTicketId(null);
+      setView('knowledge-base');
       return;
     }
     const match = path.match(/^\/tickets\/([a-zA-Z0-9-]+)$/);
@@ -154,6 +160,12 @@ export const App = () => {
     window.history.pushState({}, '', '/tickets');
   };
 
+  const handleNavigateKB = () => {
+    setSelectedTicketId(null);
+    setView('knowledge-base');
+    window.history.pushState({}, '', '/kb');
+  };
+
   const handlePageChange = (newPage: number) => {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
@@ -167,6 +179,8 @@ export const App = () => {
         onNavigateHome={() => {
           if (user) handleBackToQueue();
         }}
+        currentView={view}
+        onNavigateKB={handleNavigateKB}
       />
 
       <main className="main-content">
@@ -187,6 +201,10 @@ export const App = () => {
             onSelectTicket={handleSelectTicket}
             onNewTicket={handleNewTicket}
           />
+        )}
+
+        {user && view === 'knowledge-base' && (
+          <KnowledgeBaseView onBack={handleBackToQueue} />
         )}
 
         {user && view === 'new-ticket' && (

@@ -51,7 +51,7 @@ Required environment variables in `.env`:
 ### 4. Database Migrations
 
 #### Standard Migration Procedure (Fresh Databases & CI)
-The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`, `004_embeddings_duplicates.sql`, `005_ticket_embedding_jobs.sql`), managed by `scripts/migrate.py`.
+The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`, `004_embeddings_duplicates.sql`, `005_ticket_embedding_jobs.sql`, `006_kb_articles_chunks.sql`, `007_article_jobs.sql`), managed by `scripts/migrate.py`.
 
 To apply all pending migrations on a new database:
 ```powershell
@@ -82,10 +82,10 @@ Start the standalone queue worker process:
 cd triage-desk
 .\.venv\Scripts\python.exe -m app.worker.main
 ```
-- Standalone queue worker polling `jobs` using `SELECT ... FOR UPDATE SKIP LOCKED` (default 1.0s interval).
+- Standalone queue worker polling `jobs` and `article_jobs` using `SELECT ... FOR UPDATE SKIP LOCKED` (default 1.0s interval).
 - Loads and verifies trusted LinearSVC model (`run_004`) once on process startup. When `ENABLE_EMBEDDINGS=true`, also preloads trusted embedding model adapter (`all-MiniLM-L6-v2`).
 - Claims queued tickets, executes narrative inference, registers model version, stores prediction in `ticket_predictions`, and transitions ticket from `new` to `open`.
-- If `ENABLE_EMBEDDINGS=true`, ingest success atomically enqueues a `ticket_embedding` job; the worker claims `ticket_embedding` jobs, computes embeddings outside transactions, and completes them atomically. If `ENABLE_EMBEDDINGS=false`, embedding jobs are excluded from worker claims and remain pending without blocking ingestion.
+- When `ENABLE_EMBEDDINGS=true`, ticket ingest success atomically enqueues a `ticket_embedding` job; the worker fairly alternates claims between ticket jobs (`jobs`) and knowledge-base article jobs (`article_jobs`), computing chunk embeddings outside database transactions and committing them atomically without starving either queue. If `ENABLE_EMBEDDINGS=false`, embedding jobs are excluded from worker claims and remain pending without blocking ingestion.
 - Graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM. Optional flags: `--poll-interval <sec>`, `--lease-seconds <sec>`.
 
 #### Terminal 3: React Frontend (Vite Development Server)

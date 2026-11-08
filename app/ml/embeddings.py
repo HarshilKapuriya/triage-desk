@@ -312,26 +312,26 @@ class EmbeddingModelAdapter:
                             f"Expected hidden state dimension {EMBEDDING_DIM}, got {dim}"
                         )
 
-    def embed_ticket(self, subject: str | None, body: str | None) -> EmbeddingResult:
-        """Generate a 384-dimensional unit-normalized embedding for a ticket.
+    def embed_text(self, text: str) -> EmbeddingResult:
+        """Generate a 384-dimensional unit-normalized embedding for a plain-text passage.
 
         Args:
-            subject: Ticket subject line or title.
-            body: Ticket body or complaint narrative.
+            text: Non-empty plain text passage (e.g. knowledge-base chunk).
 
         Returns:
             EmbeddingResult containing the unit-normalized vector and pipeline metadata.
         """
-        # Step 1: Format and normalize input text
-        formatted_text = normalize_and_format_text(subject=subject, body=body)
+        clean_text = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not clean_text:
+            raise ValueError("Input text must not be empty.")
+        if len(clean_text) > MAX_INPUT_CHARS:
+            clean_text = clean_text[:MAX_INPUT_CHARS]
 
-        # Step 2: Tokenize and truncate
-        encoding = self._tokenizer.encode(formatted_text)
+        encoding = self._tokenizer.encode(clean_text)
         input_ids = np.array([encoding.ids], dtype=np.int64)
         attention_mask = np.array([encoding.attention_mask], dtype=np.int64)
         token_type_ids = np.array([encoding.type_ids], dtype=np.int64)
 
-        # Step 3: Execute ONNX inference
         ort_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -340,7 +340,6 @@ class EmbeddingModelAdapter:
         outputs = self._session.run(["last_hidden_state"], ort_inputs)
         last_hidden_state = outputs[0]
 
-        # Step 4: Attention-mask-aware mean pooling and L2 normalization
         vector = mean_pool_and_normalize(
             last_hidden_state=last_hidden_state,
             attention_mask=attention_mask,
@@ -351,6 +350,19 @@ class EmbeddingModelAdapter:
             pipeline_version=self.pipeline_version,
             model_name=self.model_name,
             model_revision=self.model_revision,
-            char_count=len(formatted_text),
+            char_count=len(clean_text),
             token_count=len(encoding.ids),
         )
+
+    def embed_ticket(self, subject: str | None, body: str | None) -> EmbeddingResult:
+        """Generate a 384-dimensional unit-normalized embedding for a ticket.
+
+        Args:
+            subject: Ticket subject line or title.
+            body: Ticket body or complaint narrative.
+
+        Returns:
+            EmbeddingResult containing the unit-normalized vector and pipeline metadata.
+        """
+        formatted_text = normalize_and_format_text(subject=subject, body=body)
+        return self.embed_text(formatted_text)

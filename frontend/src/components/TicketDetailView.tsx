@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { TicketDetailResponse, SimilarTicketsResponse } from '../types';
+import { TicketDetailResponse, SimilarTicketsResponse, RelevantKnowledgeResponse } from '../types';
 import { ProcessingBadge } from './ProcessingBadge';
 
 interface TicketDetailViewProps {
@@ -19,6 +19,10 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
   const [similarLoading, setSimilarLoading] = useState(true);
   const [similarError, setSimilarError] = useState<string | null>(null);
 
+  const [knowledgeData, setKnowledgeData] = useState<RelevantKnowledgeResponse | null>(null);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(true);
+  const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
+
   const [rowPendingId, setRowPendingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<{ [ticketId: string]: string }>({});
 
@@ -32,19 +36,28 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
       setLoading(true);
       setData(null);
       setSimilarData(null);
+      setKnowledgeData(null);
     }
     setError(null);
     setSimilarLoading(true);
     setSimilarError(null);
+    setKnowledgeLoading(true);
+    setKnowledgeError(null);
     setRowPendingId(null);
     setRowErrors({});
 
     try {
-      const [ticketRes, similarRes] = await Promise.all([
+      const [ticketRes, similarRes, knowledgeRes] = await Promise.all([
         api.getTicketDetail(targetTicketId),
         api.getSimilarTickets(targetTicketId).catch((err) => {
           if (currentTicketIdRef.current === targetTicketId) {
             setSimilarError(err instanceof Error ? err.message : 'Failed to fetch similar tickets.');
+          }
+          return null;
+        }),
+        api.getRelevantKnowledge(targetTicketId).catch((err) => {
+          if (currentTicketIdRef.current === targetTicketId) {
+            setKnowledgeError(err instanceof Error ? err.message : 'Failed to fetch relevant knowledge.');
           }
           return null;
         }),
@@ -60,6 +73,12 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
       } else if (!similarRes) {
         setSimilarData(null);
       }
+
+      if (knowledgeRes && knowledgeRes.ticket_id === targetTicketId) {
+        setKnowledgeData(knowledgeRes);
+      } else if (!knowledgeRes) {
+        setKnowledgeData(null);
+      }
     } catch (err) {
       if (currentTicketIdRef.current === targetTicketId) {
         setError(err instanceof Error ? err.message : 'Failed to load ticket.');
@@ -67,6 +86,7 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
     } finally {
       if (currentTicketIdRef.current === targetTicketId) {
         setSimilarLoading(false);
+        setKnowledgeLoading(false);
         if (isManualRefresh) {
           setRefreshing(false);
         } else {
@@ -513,6 +533,236 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
 
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', lineHeight: 1.4 }}>
                   <strong>Notice</strong>: {similarData.notice} Human confirmation records a duplicate decision only; tickets are not merged or closed, and feedback does not alter model predictions automatically.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Relevant Knowledge Section */}
+          <div className="card" style={{ padding: '24px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                  Relevant Knowledge
+                </h2>
+                {knowledgeData?.model_name && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Embedding model: {knowledgeData.model_name}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', marginBottom: 0 }}>
+                Candidate knowledge-base excerpts ranked by cosine similarity against this complaint.
+              </p>
+            </div>
+
+            {knowledgeLoading ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Retrieving relevant knowledge excerpts...
+              </div>
+            ) : knowledgeError ? (
+              <div className="alert alert-danger" style={{ margin: 0, fontSize: '13px' }}>
+                Unable to load relevant knowledge: {knowledgeError}
+              </div>
+            ) : knowledgeData?.status === 'missing_ticket_embedding' ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  Embedding Not Ready
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {knowledgeData.message ||
+                    'No embedding vector has been generated for this ticket yet. Knowledge retrieval requires an embedded ticket.'}
+                </p>
+              </div>
+            ) : knowledgeData?.status === 'no_chunks_available' ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  No Knowledge Base Content
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {knowledgeData.message ||
+                    'No knowledge-base articles or passages exist for this tenant. Visit Knowledge Base to add articles.'}
+                </p>
+              </div>
+            ) : knowledgeData?.status === 'articles_processing' ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  Articles Still Processing
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {knowledgeData.message ||
+                    'Knowledge-base articles have been ingested, but passage chunk embeddings are still processing or pending background queue activation.'}
+                </p>
+              </div>
+            ) : knowledgeData?.status === 'articles_failed' ? (
+              <div
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#b91c1c', marginBottom: '4px' }}>
+                  Knowledge Embedding Failed
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {knowledgeData.message ||
+                    'Tenant knowledge-base articles failed background embedding. Please check the Knowledge Base view.'}
+                </p>
+              </div>
+            ) : knowledgeData?.status === 'model_mismatch' ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  Embedding Model Incompatible
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {knowledgeData.message ||
+                    'Existing knowledge-base chunks were generated using a different model or version than this ticket.'}
+                </p>
+              </div>
+            ) : !knowledgeData?.items || knowledgeData.items.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  No Relevant Excerpts Found
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  No knowledge-base passages qualified for this complaint under the active embedding model.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {knowledgeData.items.map((item) => (
+                    <div
+                      key={item.chunk_id}
+                      style={{
+                        backgroundColor: 'var(--bg-subtle)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '14px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'baseline',
+                          marginBottom: '6px',
+                        }}
+                      >
+                        <div>
+                          <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                            {item.article_title}
+                          </strong>
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              fontSize: '11px',
+                              color: 'var(--text-muted)',
+                              fontFamily: 'var(--font-mono)',
+                            }}
+                          >
+                            Article: <code className="text-mono">{item.article_id.slice(0, 8)}</code> · Chunk #{item.chunk_index + 1} (<code className="text-mono">{item.chunk_id.slice(0, 8)}</code>)
+                          </span>
+                        </div>
+                        <span
+                          title="Exact cosine similarity between ticket embedding and knowledge-base chunks [-1.0, 1.0]. Not a calibrated confidence score."
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: item.similarity_score >= 0.75 ? 'var(--primary)' : 'var(--text-main)',
+                          }}
+                        >
+                          Cosine Sim: {item.similarity_score.toFixed(4)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          lineHeight: 1.5,
+                          color: 'var(--text-main)',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          backgroundColor: 'var(--bg-card)',
+                          padding: '10px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        {item.excerpt}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          color: 'var(--text-muted)',
+                          marginTop: '6px',
+                          display: 'flex',
+                          gap: '12px',
+                        }}
+                      >
+                        <span>
+                          Article Ref: <code className="text-mono">{item.article_id.slice(0, 8)}</code>
+                        </span>
+                        <span>Tokens: {item.token_count}</span>
+                        <span>Chars: {item.char_count}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--text-muted)',
+                    marginTop: '14px',
+                    marginBottom: 0,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <strong>Notice</strong>: {knowledgeData.notice}
                 </p>
               </div>
             )}

@@ -30,6 +30,8 @@ from app.deps_browser import (
 )
 from app.repositories.auth import get_user_by_email
 import app.repositories.duplicates as dup_repo
+import app.repositories.kb as kb_repo
+from app.ml.chunking import chunk_article_text, ChunkingError
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
 from app.repositories.ml import get_prediction_with_model_for_ticket
 from app.repositories.tickets import (
@@ -174,6 +176,20 @@ class SimilarFeedbackPayload(BaseModel):
 
 class SimilarFeedbackBodyPayload(SimilarFeedbackPayload):
     similar_ticket_id: str = Field(..., description="Target similar ticket ID.")
+
+
+class CreateKBArticlePayload(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300, description="Article title (1-300 chars).")
+    body: str = Field(..., min_length=1, max_length=20000, description="Article body content (1-20,000 chars).")
+    csrf_token: str | None = Field(default=None, max_length=255, description="Optional CSRF token in body if not in header.")
+
+    @field_validator("title", "body")
+    @classmethod
+    def validate_non_blank(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("Field must not be blank.")
+        return cleaned
 
 
 # ---------------------------------------------------------------------------
@@ -753,4 +769,184 @@ async def record_similar_feedback_body_json(
         "decision": link.status,
         "reviewed_at": link.reviewed_at.isoformat() if link.reviewed_at else None,
         "notice": "Human duplicate decision recorded. This does not alter ticket contents or automatically retrain models.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Base Articles & Retrieval Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/kb/articles", status_code=status.HTTP_201_CREATED)
+async def create_kb_article_json(
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Create a tenant-owned knowledge-base article and partition into deterministic chunks.
+
+    Guarantees:
+    - Authenticated session principal.
+    - CSRF protection validated against active session.
+    - 32 KiB raw request body bound enforced via stream byte counting.
+    - Title (1-300 chars) and body (1-20,000 chars) validated.
+    - Deterministic chunking respecting model tokenizer length (TOKENIZER_MAX_LENGTH=256).
+    - Composite foreign key (tenant_id, article_id) enforced on chunks.
+    - Queue constraint: Does not force article IDs into ticket-specific jobs queue.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    raw_data = await read_bounded_json_body(request)
+    try:
+        payload = CreateKBArticlePayload.model_validate(raw_data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+    validate_browser_csrf(request, "triage_session", payload.csrf_token)
+
+    try:
+        chunks = chunk_article_text(title=payload.title, body=payload.body)
+    except ChunkingError as err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "invalid_article", "message": str(err)},
+        )
+
+    with get_connection() as conn:
+        with conn.transaction():
+            article = kb_repo.create_kb_article(
+                conn=conn,
+                tenant_id=principal.tenant_id,
+                title=payload.title,
+                body=payload.body,
+                status="processing",
+            )
+            created_chunks = kb_repo.create_kb_chunks(
+                conn=conn,
+                tenant_id=principal.tenant_id,
+                article_id=article.id,
+                chunks=chunks,
+            )
+            job = kb_repo.enqueue_article_job(
+                conn=conn,
+                tenant_id=principal.tenant_id,
+                article_id=article.id,
+                job_type="article_embedding",
+            )
+
+    return {
+        "id": str(article.id),
+        "title": article.title,
+        "status": article.status,
+        "chunk_count": len(created_chunks),
+        "created_at": article.created_at.isoformat(),
+        "notice": "Article ingested and partitioned into deterministic chunks. Background chunk embedding job enqueued.",
+    }
+
+
+@router.get("/kb/articles")
+def list_kb_articles_json(
+    request: Request,
+    response: Response,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """List tenant-owned knowledge-base articles with chunk counts and processing states."""
+    response.headers["Cache-Control"] = "no-store"
+
+    with get_connection() as conn:
+        articles = kb_repo.list_kb_articles(
+            conn=conn,
+            tenant_id=principal.tenant_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    return {
+        "items": [
+            {
+                "id": str(a.id),
+                "title": a.title,
+                "status": a.status,
+                "chunk_count": a.chunk_count,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+            }
+            for a in articles
+        ]
+    }
+
+
+@router.get("/tickets/{ticket_id}/relevant-knowledge")
+def get_relevant_knowledge_json(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    limit: int = Query(default=5, ge=1, le=20),
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Retrieve top-k relevant knowledge-base excerpts for a ticket using exact cosine similarity.
+
+    Distinct States:
+    - 'missing_ticket_embedding': Ticket has no embedding vector in ticket_embeddings.
+    - 'no_chunks_available': Tenant has no knowledge-base articles or chunks.
+    - 'articles_processing': Articles/chunks exist, but embeddings are still pending/processing.
+    - 'ready': Retrieval succeeded (may return 0 items if none qualify).
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    with get_connection() as conn:
+        ticket = get_ticket_by_id(conn, principal.tenant_id, ticket_uuid)
+        if not ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        retrieval_status, model_name, model_version, candidates = kb_repo.find_relevant_chunks_for_ticket(
+            conn=conn,
+            tenant_id=principal.tenant_id,
+            ticket_id=ticket_uuid,
+            limit=limit,
+        )
+
+    messages = {
+        "missing_ticket_embedding": "No embedding vector has been generated for this ticket yet. Knowledge retrieval requires an embedded ticket.",
+        "no_chunks_available": "No knowledge-base articles or passages exist for this tenant.",
+        "articles_processing": "Knowledge-base articles have been ingested, but chunk embeddings are still being processed or pending queue activation.",
+        "articles_failed": "Tenant knowledge-base articles failed background embedding. Please check the Knowledge Base view.",
+        "model_mismatch": "Existing knowledge-base chunks were generated using a different model or version than this ticket.",
+        "ready": None,
+    }
+
+    items = [
+        {
+            "chunk_id": str(c.chunk_id),
+            "article_id": str(c.article_id),
+            "article_title": c.article_title,
+            "chunk_index": c.chunk_index,
+            "excerpt": c.excerpt,
+            "char_count": c.char_count,
+            "token_count": c.token_count,
+            "similarity_score": round(c.similarity_score, 4),
+        }
+        for c in candidates
+    ]
+
+    return {
+        "ticket_id": str(ticket_uuid),
+        "status": retrieval_status,
+        "model_name": model_name,
+        "model_version": model_version,
+        "items": items,
+        "notice": "Candidate knowledge-base excerpts based on exact cosine similarity against this ticket's embedding vector. Not a calibrated confidence score.",
+        "message": messages.get(retrieval_status),
     }

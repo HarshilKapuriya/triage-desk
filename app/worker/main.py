@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 
 from app.config import get_settings
 import app.repositories.jobs as job_repo
-from app.worker.handler import process_claimed_job
+import app.repositories.kb as kb_repo
+from app.worker.handler import process_claimed_job, process_claimed_article_job
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +57,7 @@ class WorkerService:
             enable_embeddings if enable_embeddings is not None else cfg.enable_embeddings
         )
         self.embedding_adapter = embedding_adapter
+        self._next_queue_turn = "ticket"
 
     def stop(self) -> None:
         """Signal the worker to stop gracefully."""
@@ -69,6 +71,8 @@ class WorkerService:
     def run_one_cycle(self, conn: psycopg.Connection, tenant_id: uuid.UUID | None = None) -> str | None:
         """Execute one cycle: recover stale jobs if interval elapsed, then claim and process one job.
 
+        Alternates fairly between ticket jobs and article jobs using round-robin polling.
+
         Returns:
             str | None: Result status if a job was claimed ('completed', 'requeued', etc.),
                         or None if the queue was empty.
@@ -77,15 +81,29 @@ class WorkerService:
         if now - self._last_recovery_time >= self.recovery_interval:
             try:
                 with conn.transaction():
-                    recovered = job_repo.recover_stale_jobs(
+                    recovered_ticket = job_repo.recover_stale_jobs(
                         conn=conn,
                         lease_seconds=self.lease_seconds,
                         tenant_id=tenant_id,
                     )
-                if recovered > 0:
-                    logger.info(f"Worker {self.worker_id}: recovered {recovered} stale job(s).")
+                if recovered_ticket > 0:
+                    logger.info(f"Worker {self.worker_id}: recovered {recovered_ticket} stale ticket job(s).")
             except Exception as e:
-                logger.error(f"Worker {self.worker_id}: error during stale job recovery: {e}")
+                logger.error(f"Worker {self.worker_id}: error during ticket stale job recovery: {e}")
+
+            if self.enable_embeddings:
+                try:
+                    with conn.transaction():
+                        recovered_article = kb_repo.recover_stale_article_jobs(
+                            conn=conn,
+                            lease_seconds=self.lease_seconds,
+                            tenant_id=tenant_id,
+                        )
+                    if recovered_article > 0:
+                        logger.info(f"Worker {self.worker_id}: recovered {recovered_article} stale article job(s).")
+                except Exception as e:
+                    logger.warning(f"Worker {self.worker_id}: article stale job recovery skipped/failed: {e}")
+
             self._last_recovery_time = now
 
         allowed_types: tuple[str, ...] = (
@@ -94,35 +112,87 @@ class WorkerService:
             else ("ticket_ingest",)
         )
 
-        # Claim next eligible queued job
-        job: job_repo.JobRecord | None = None
-        try:
-            with conn.transaction():
-                job = job_repo.claim_next_job(
-                    conn=conn,
-                    worker_id=self.worker_id,
-                    lease_seconds=self.lease_seconds,
-                    tenant_id=tenant_id,
-                    allowed_types=allowed_types,
-                )
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id}: error claiming job: {e}")
+        job_claimed = None
+        job_kind: str | None = None
+
+        # Determine attempt order based on fair round-robin queue turn
+        if not self.enable_embeddings:
+            attempt_order = ["ticket"]
+        elif self._next_queue_turn == "ticket":
+            attempt_order = ["ticket", "article"]
+        else:
+            attempt_order = ["article", "ticket"]
+
+        for queue_type in attempt_order:
+            if queue_type == "ticket":
+                try:
+                    with conn.transaction():
+                        t_job = job_repo.claim_next_job(
+                            conn=conn,
+                            worker_id=self.worker_id,
+                            lease_seconds=self.lease_seconds,
+                            tenant_id=tenant_id,
+                            allowed_types=allowed_types,
+                        )
+                    if t_job:
+                        job_claimed = t_job
+                        job_kind = "ticket"
+                        if self.enable_embeddings:
+                            self._next_queue_turn = "article"
+                        break
+                except Exception as e:
+                    logger.error(f"Worker {self.worker_id}: error claiming ticket job: {e}")
+                    return None
+            elif queue_type == "article":
+                try:
+                    with conn.transaction():
+                        a_job = kb_repo.claim_next_article_job(
+                            conn=conn,
+                            worker_id=self.worker_id,
+                            lease_seconds=self.lease_seconds,
+                            tenant_id=tenant_id,
+                        )
+                    if a_job:
+                        job_claimed = a_job
+                        job_kind = "article"
+                        if self.enable_embeddings:
+                            self._next_queue_turn = "ticket"
+                        break
+                except Exception as e:
+                    logger.warning(
+                        f"Worker {self.worker_id}: error claiming article job (table may not be migrated yet): {e}"
+                    )
+                    if self.enable_embeddings:
+                        self._next_queue_turn = "ticket"
+                    continue
+
+        if not job_claimed or not job_kind:
             return None
 
-        if not job:
-            return None
-
-        logger.info(f"Worker {self.worker_id}: claimed job {job.id} (type={job.type}, gen={job.attempts})")
-        result = process_claimed_job(
-            conn=conn,
-            job=job,
-            worker_id=self.worker_id,
-            lease_seconds=self.lease_seconds,
-            enable_embeddings=self.enable_embeddings,
-            embedding_adapter=self.embedding_adapter,
-        )
-        logger.info(f"Worker {self.worker_id}: job {job.id} finished with status '{result}'")
-        return result
+        if job_kind == "ticket":
+            logger.info(f"Worker {self.worker_id}: claimed ticket job {job_claimed.id} (type={job_claimed.type}, gen={job_claimed.attempts})")
+            result = process_claimed_job(
+                conn=conn,
+                job=job_claimed,
+                worker_id=self.worker_id,
+                lease_seconds=self.lease_seconds,
+                enable_embeddings=self.enable_embeddings,
+                embedding_adapter=self.embedding_adapter,
+            )
+            logger.info(f"Worker {self.worker_id}: ticket job {job_claimed.id} finished with status '{result}'")
+            return result
+        else:
+            logger.info(f"Worker {self.worker_id}: claimed article job {job_claimed.id} (type={job_claimed.type}, gen={job_claimed.attempts})")
+            result = process_claimed_article_job(
+                conn=conn,
+                job=job_claimed,
+                worker_id=self.worker_id,
+                lease_seconds=self.lease_seconds,
+                enable_embeddings=self.enable_embeddings,
+                embedding_adapter=self.embedding_adapter,
+            )
+            logger.info(f"Worker {self.worker_id}: article job {job_claimed.id} finished with status '{result}'")
+            return result
 
     def start(self) -> None:
         """Run worker loop until stopped."""
