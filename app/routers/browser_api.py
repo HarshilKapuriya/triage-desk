@@ -29,6 +29,7 @@ from app.deps_browser import (
     validate_browser_csrf,
 )
 from app.repositories.auth import get_user_by_email
+import app.repositories.duplicates as dup_repo
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
 from app.repositories.ml import get_prediction_with_model_for_ticket
 from app.repositories.tickets import (
@@ -494,3 +495,70 @@ def get_ticket_detail_json(
         },
     }
 
+
+@router.get("/tickets/{ticket_id}/similar")
+def get_similar_tickets_json(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    limit: int = Query(default=5, ge=1, le=20),
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Retrieve top-k similar ticket suggestions for a ticket within the authenticated tenant.
+
+    - Exact cosine-similarity retrieval using existing ticket_embeddings.
+    - Scoped strictly to authenticated tenant and same model_name and model_version.
+    - Excludes the source ticket.
+    - Returns bounded, deterministically ordered list with ticket summaries and similarity scores.
+    - Distinguishes missing/not-ready embeddings vs zero candidates.
+    - Strictly describes results as possible similar tickets, not confirmed duplicates.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    with get_connection() as conn:
+        # Verify ticket exists within this tenant
+        ticket = get_ticket_by_id(conn, principal.tenant_id, ticket_uuid)
+        if not ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        has_embedding, model_name, model_version, candidates = dup_repo.find_similar_tickets_for_ticket(
+            conn=conn,
+            tenant_id=principal.tenant_id,
+            ticket_id=ticket_uuid,
+            limit=limit,
+        )
+
+    items = [
+        {
+            "ticket_id": str(c.ticket_id),
+            "external_id": c.external_id,
+            "subject": c.subject,
+            "status": c.status,
+            "priority": c.priority,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "similarity_score": round(c.similarity_score, 4),
+        }
+        for c in candidates
+    ]
+
+    return {
+        "ticket_id": str(ticket_uuid),
+        "has_embedding": has_embedding,
+        "embedding_status": "ready" if has_embedding else "not_ready",
+        "model_name": model_name,
+        "model_version": model_version,
+        "items": items,
+        "notice": "Possible similar tickets based on uncalibrated cosine text similarity. Relevance quality is not evaluated; duplicate links are not automatically created.",
+        "message": None if has_embedding else "No embedding vector has been generated for this ticket yet. Similar ticket suggestions will become available once background embedding processing completes.",
+    }

@@ -324,8 +324,11 @@ python -m pytest tests/test_embedding_adapter.py -v
 # Run independent ticket_embedding job unit tests (offline, fakes/mocks)
 python -m pytest tests/test_embedding_jobs_unit.py -v
 
+# Run tenant-scoped similar-ticket suggestions unit tests (offline, fakes/mocks)
+python -m pytest tests/test_similar_tickets_unit.py -v
+
 # Run embedding database integration tests (strictly requires local disposable PostgreSQL; skips on hosted DBs)
-python -m pytest tests/test_embedding_jobs_db.py -v
+python -m pytest tests/test_embedding_jobs_db.py tests/test_similar_tickets_db.py -v
 
 # Run database integration tests (requires configured TEST_DATABASE_URL)
 python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py tests/test_duplicates_db.py -v
@@ -359,7 +362,12 @@ python -m pytest tests/test_isolation.py -v
   - *Retained Execution Boundaries*: Real-model inference was not executed; artifact provisioning was not executed; worker integration was not implemented; duplicate-detection quality was not evaluated; and remote CI was last observed billing-blocked before execution.
 - **Phase 4 Slice 3 Independent Embedding Jobs (`pytest tests/test_embedding_jobs_unit.py -v`)**: 13 passed, 0 failed.
   - *Offline Test Coverage*: Verified atomic enqueue of `ticket_embedding` job on `ticket_ingest` completion only when `ENABLE_EMBEDDINGS=true`; zero enqueue when disabled; worker claim exclusion of embedding jobs when disabled (`allowed_types=("ticket_ingest",)`); safe release to `queued` if an embedding job is claimed while disabled; CPU tensor inference execution outside DB transactions; atomic completion and embedding persistence in caller transaction; isolation of embedding failure from category predictions; lease renewal and stale claim fencing (`StaleClaimError` on expired lease or worker mismatch); and idempotent enqueueing (`ON CONFLICT DO NOTHING`).
-  - *Database Integration Safety*: `tests/test_embedding_jobs_db.py` contains a strict guard requiring a local disposable PostgreSQL instance (localhost/127.0.0.1); 2 tests cleanly skipped when running in environments without a local throwaway database, preventing any connections to hosted Supabase.
+  - *Database Integration Safety*: `tests/test_embedding_jobs_db.py` contains a strict guard requiring a local disposable PostgreSQL instance (localhost/127.0.0.1); cleanly skipped when running in environments without a local throwaway database, preventing any connections to hosted Supabase.
+- **Phase 4 Slice 4 Tenant-Scoped Similar-Ticket Suggestions (`pytest tests/test_similar_tickets_unit.py -v`)**: 8 passed, 0 failed.
+  - *Offline Test Coverage*: Verified exact cosine-similarity retrieval contract, deterministic ordering by cosine distance ASC and ticket ID ASC, strict tenant and model_name/model_version scoping, source ticket exclusion, limit clamping [1, 50], and score clamping [-1.0, 1.0]. Verified browser API endpoint `GET /browser-api/tickets/{ticket_id}/similar`: 401 unauthenticated JSON rejection, 404 on invalid UUID / missing / cross-tenant tickets, distinct `embedding_status='not_ready'` when source ticket has no embedding (never shown as "no matches"), `embedding_status='ready'` with candidates when embeddings exist, and `Cache-Control: no-store`.
+  - *Database Integration Safety*: `tests/test_similar_tickets_db.py` contains a strict disposability guard requiring an established local throwaway PostgreSQL instance (5 tests cleanly skipped in environments without local Postgres, avoiding hosted Supabase).
+  - *UI State Contract*: Added "Similar tickets" card to ticket detail view, distinguishing loading, request error, not-ready embedding, zero matches, and candidate list with uncalibrated similarity scores.
+
 
 ### 2. Manual Browser Testing Record (2026-11-06)
 - **Ticket Submission Smoke Test (Conducted by User)**:

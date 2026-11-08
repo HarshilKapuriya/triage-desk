@@ -197,7 +197,11 @@ export const App = () => {
         )}
 
         {user && view === 'ticket-detail' && selectedTicketId && (
-          <TicketDetailView ticketId={selectedTicketId} onBack={handleBackToQueue} />
+          <TicketDetailView
+            ticketId={selectedTicketId}
+            onBack={handleBackToQueue}
+            onSelectTicket={handleSelectTicket}
+          />
         )}
       </main>
 
@@ -208,4 +212,3 @@ export const App = () => {
     </div>
   );
 };
-

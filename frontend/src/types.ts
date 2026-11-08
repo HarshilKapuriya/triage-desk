@@ -68,3 +68,23 @@ export interface TicketDetailResponse {
   notices: DomainNotices;
 }
 
+export interface SimilarTicketItem {
+  ticket_id: string;
+  external_id: string | null;
+  subject: string;
+  status: string;
+  priority: string | null;
+  created_at: string | null;
+  similarity_score: number;
+}
+
+export interface SimilarTicketsResponse {
+  ticket_id: string;
+  has_embedding: boolean;
+  embedding_status: 'ready' | 'not_ready' | string;
+  model_name: string | null;
+  model_version: string | null;
+  items: SimilarTicketItem[];
+  notice: string;
+  message?: string | null;
+}

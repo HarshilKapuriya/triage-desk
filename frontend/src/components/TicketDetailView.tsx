@@ -1,44 +1,84 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { TicketDetailResponse } from '../types';
+import { TicketDetailResponse, SimilarTicketsResponse } from '../types';
 import { ProcessingBadge } from './ProcessingBadge';
 
 interface TicketDetailViewProps {
   ticketId: string;
   onBack: () => void;
+  onSelectTicket?: (ticketId: string) => void;
 }
 
-export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) => {
+export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDetailViewProps) => {
   const [data, setData] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDetail = async (isManualRefresh = false) => {
+  const [similarData, setSimilarData] = useState<SimilarTicketsResponse | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(true);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+
+  const currentTicketIdRef = useRef(ticketId);
+  currentTicketIdRef.current = ticketId;
+
+  const loadTicketData = async (targetTicketId: string, isManualRefresh = false) => {
     if (isManualRefresh) {
       setRefreshing(true);
     } else {
       setLoading(true);
+      setData(null);
+      setSimilarData(null);
     }
     setError(null);
+    setSimilarLoading(true);
+    setSimilarError(null);
 
     try {
-      const res = await api.getTicketDetail(ticketId);
-      setData(res);
+      const [ticketRes, similarRes] = await Promise.all([
+        api.getTicketDetail(targetTicketId),
+        api.getSimilarTickets(targetTicketId).catch((err) => {
+          if (currentTicketIdRef.current === targetTicketId) {
+            setSimilarError(err instanceof Error ? err.message : 'Failed to fetch similar tickets.');
+          }
+          return null;
+        }),
+      ]);
+
+      if (currentTicketIdRef.current !== targetTicketId) {
+        return;
+      }
+
+      setData(ticketRes);
+      if (similarRes && similarRes.ticket_id === targetTicketId) {
+        setSimilarData(similarRes);
+      } else if (!similarRes) {
+        setSimilarData(null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load ticket.');
+      if (currentTicketIdRef.current === targetTicketId) {
+        setError(err instanceof Error ? err.message : 'Failed to load ticket.');
+      }
     } finally {
-      if (isManualRefresh) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
+      if (currentTicketIdRef.current === targetTicketId) {
+        setSimilarLoading(false);
+        if (isManualRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
       }
     }
   };
 
   useEffect(() => {
-    fetchDetail(false);
+    currentTicketIdRef.current = ticketId;
+    loadTicketData(ticketId, false);
   }, [ticketId]);
+
+  const handleRefresh = () => {
+    loadTicketData(ticketId, true);
+  };
 
   if (loading) {
     return (
@@ -109,7 +149,7 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
         <button
           type="button"
           className="btn btn-secondary"
-          onClick={() => fetchDetail(true)}
+          onClick={handleRefresh}
           disabled={refreshing || loading}
           style={{ padding: '6px 12px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
@@ -153,33 +193,165 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
           alignItems: 'start',
         }}
       >
-        {/* Left: Consumer Complaint Narrative */}
-        <div className="card" style={{ padding: '24px' }}>
-          <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
-              Consumer Complaint Narrative
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Full customer submission as received by the ingestion pipeline.
-            </p>
+        {/* Left: Consumer Complaint Narrative & Similar Tickets */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '24px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
+                Consumer Complaint Narrative
+              </h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Full customer submission as received by the ingestion pipeline.
+              </p>
+            </div>
+
+            {/* Render customer content strictly as text (no dangerouslySetInnerHTML) */}
+            <div
+              style={{
+                backgroundColor: 'var(--bg-subtle)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '4px',
+                padding: '16px',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                color: 'var(--text-main)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              {ticket.body}
+            </div>
           </div>
 
-          {/* Render customer content strictly as text (no dangerouslySetInnerHTML) */}
-          <div
-            style={{
-              backgroundColor: 'var(--bg-subtle)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '4px',
-              padding: '16px',
-              fontSize: '13px',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              color: 'var(--text-main)',
-              fontFamily: 'var(--font-sans)',
-            }}
-          >
-            {ticket.body}
+          {/* Similar Tickets Section */}
+          <div className="card" style={{ padding: '24px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Similar Tickets
+                </h2>
+                {similarData?.model_name && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Selected embedding model: {similarData.model_name}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Candidate matches based on exact cosine similarity of sentence embeddings.
+              </p>
+            </div>
+
+            {similarLoading ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Finding possible similar tickets...
+              </div>
+            ) : similarError ? (
+              <div className="alert alert-danger" style={{ margin: 0, fontSize: '13px' }}>
+                Unable to load similar tickets: {similarError}
+              </div>
+            ) : !similarData?.has_embedding || similarData?.embedding_status === 'not_ready' ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  Embedding Not Ready
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {similarData?.message ||
+                    'No embedding vector has been generated for this ticket yet. Similar ticket suggestions will become available once background embedding generation is enabled and completed.'}
+                </p>
+              </div>
+            ) : similarData.items.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  No Similar Tickets Found
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  No other tickets in this tenant share embeddings generated by the selected embedding model ({similarData.model_name}).
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600 }}>Subject</th>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, width: '90px' }}>Status</th>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '140px' }}>
+                          Cosine Similarity
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {similarData.items.map((item) => (
+                        <tr key={item.ticket_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '10px' }}>
+                            {onSelectTicket ? (
+                              <button
+                                type="button"
+                                onClick={() => onSelectTicket(item.ticket_id)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  color: 'var(--accent)',
+                                  fontWeight: 500,
+                                  fontSize: '13px',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                {item.subject}
+                              </button>
+                            ) : (
+                              <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{item.subject}</span>
+                            )}
+                            {item.external_id && (
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                Ref: <code className="text-mono">{item.external_id}</code>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            <span className={`badge badge-status-${item.status.toLowerCase()}`}>{item.status}</span>
+                          </td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
+                            <span
+                              title="Exact cosine similarity between embedding vectors [-1.0, 1.0]. Not a calibrated probability."
+                              style={{
+                                color: item.similarity_score >= 0.8 ? 'var(--primary)' : 'var(--text-main)',
+                              }}
+                            >
+                              {item.similarity_score.toFixed(4)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', lineHeight: 1.4 }}>
+                  <strong>Notice</strong>: {similarData.notice}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -447,4 +619,3 @@ export const TicketDetailView = ({ ticketId, onBack }: TicketDetailViewProps) =>
     </div>
   );
 };
-

@@ -68,6 +68,18 @@ class DuplicateLinkRecord:
     reviewed_at: datetime | None
 
 
+@dataclass(frozen=True)
+class SimilarTicketCandidate:
+    """Read-only view of a candidate similar ticket with exact cosine similarity."""
+    ticket_id: uuid.UUID
+    external_id: str | None
+    subject: str
+    status: str
+    priority: str | None
+    created_at: datetime
+    similarity_score: float
+
+
 def _parse_vector(raw: Any) -> list[float]:
     """Parse vector representation returned by postgres/psycopg into list of floats."""
     if isinstance(raw, list):
@@ -197,6 +209,109 @@ def delete_ticket_embedding(
     with conn.cursor() as cur:
         cur.execute(query, params)
         return cur.rowcount
+
+
+def find_similar_tickets_for_ticket(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    limit: int = 5,
+    model_name: str | None = None,
+    model_version: str | None = None,
+) -> tuple[bool, str | None, str | None, list[SimilarTicketCandidate]]:
+    """Retrieve top-k similar tickets for a given ticket within the same tenant.
+
+    Rules:
+    1. Looks up the source ticket's embedding. If none exists, returns (False, None, None, []).
+    2. Compares strictly embeddings belonging to the authenticated tenant.
+    3. Requires matching the exact model_name and model_version.
+    4. Excludes the source ticket (ticket_id <> source_ticket_id).
+    5. Computes exact cosine similarity via pgvector (1.0 - (te.embedding <=> source.embedding)).
+    6. Deterministically orders by (te.embedding <=> source.embedding) ASC, t.id ASC.
+    7. Clamps bounded limit (1 <= limit <= 50).
+    8. Similarity score is clamped in [-1.0, 1.0].
+
+    Returns:
+        tuple[bool, str | None, str | None, list[SimilarTicketCandidate]]:
+            (has_embedding, model_name, model_version, candidates)
+    """
+    bounded_limit = max(1, min(50, limit))
+
+    # 1. Fetch source ticket embedding
+    if model_name is not None and model_version is not None:
+        source_emb_query = """
+            SELECT embedding::text, model_name, model_version
+            FROM ticket_embeddings
+            WHERE tenant_id = %s AND ticket_id = %s AND model_name = %s AND model_version = %s;
+        """
+        source_params = (tenant_id, ticket_id, model_name, model_version)
+    else:
+        source_emb_query = """
+            SELECT embedding::text, model_name, model_version
+            FROM ticket_embeddings
+            WHERE tenant_id = %s AND ticket_id = %s
+            ORDER BY updated_at DESC, created_at DESC, id DESC
+            LIMIT 1;
+        """
+        source_params = (tenant_id, ticket_id)
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(source_emb_query, source_params)
+        source_row = cur.fetchone()
+        if not source_row:
+            return False, None, None, []
+
+        resolved_model_name = str(source_row["model_name"])
+        resolved_model_version = str(source_row["model_version"])
+        source_vec_str = str(source_row["embedding"])
+
+        # 2. Retrieve top-k candidates in same tenant with matching model
+        candidate_query = """
+            SELECT
+                t.id AS ticket_id,
+                t.external_id,
+                t.subject,
+                t.status,
+                t.priority,
+                t.created_at,
+                (1.0 - (te.embedding <=> %s::vector)) AS similarity_score
+            FROM ticket_embeddings te
+            JOIN tickets t ON t.id = te.ticket_id AND t.tenant_id = te.tenant_id
+            WHERE te.tenant_id = %s
+              AND te.model_name = %s
+              AND te.model_version = %s
+              AND te.ticket_id <> %s
+            ORDER BY te.embedding <=> %s::vector ASC, t.id ASC
+            LIMIT %s;
+        """
+        cur.execute(
+            candidate_query,
+            (
+                source_vec_str,
+                tenant_id,
+                resolved_model_name,
+                resolved_model_version,
+                ticket_id,
+                source_vec_str,
+                bounded_limit,
+            ),
+        )
+        rows = cur.fetchall()
+
+        candidates = [
+            SimilarTicketCandidate(
+                ticket_id=uuid.UUID(str(r["ticket_id"])),
+                external_id=r["external_id"],
+                subject=r["subject"],
+                status=r["status"],
+                priority=r["priority"],
+                created_at=r["created_at"],
+                similarity_score=max(-1.0, min(1.0, float(r["similarity_score"]))),
+            )
+            for r in rows
+        ]
+
+        return True, resolved_model_name, resolved_model_version, candidates
 
 
 # ==============================================================================

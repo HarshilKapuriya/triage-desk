@@ -1,4 +1,4 @@
-import { User, TicketListItem, Pagination, TicketDetailResponse } from './types';
+import { User, TicketListItem, Pagination, TicketDetailResponse, SimilarTicketsResponse } from './types';
 
 class ApiClient {
   private csrfToken: string | null = null;
@@ -93,6 +93,10 @@ class ApiClient {
     return this.request<TicketDetailResponse>(`/browser-api/tickets/${ticketId}`);
   }
 
+  public async getSimilarTickets(ticketId: string, limit = 5): Promise<SimilarTicketsResponse> {
+    return this.request<SimilarTicketsResponse>(`/browser-api/tickets/${ticketId}/similar?limit=${limit}`);
+  }
+
   public async createTicket(
     subject: string,
     body: string
@@ -109,4 +113,3 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
-
