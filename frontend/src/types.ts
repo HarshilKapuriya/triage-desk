@@ -194,3 +194,52 @@ export interface SLAPolicyMutationResponse {
   schema_available: boolean;
   policy: SLAPolicyItem;
 }
+
+export interface DashboardStatusCounts {
+  new: number;
+  open: number;
+  pending: number;
+  resolved: number;
+  closed: number;
+  total: number;
+}
+
+export interface DashboardWorkload {
+  open: number;
+  completed: number;
+  total: number;
+  scope_label: string;
+}
+
+export interface DashboardTargetMetrics {
+  eligible_total: number;
+  data_quality_issues: number;
+  valid_eligible_total: number;
+  completed_on_time: number;
+  completed_late: number;
+  completed_total: number;
+  incomplete_before_deadline: number;
+  incomplete_due_now: number;
+  incomplete_overdue: number;
+  incomplete_total: number;
+  completed_timeliness_rate: number | null;
+  incomplete_not_overdue_rate: number | null;
+}
+
+export interface DashboardSLASummary {
+  policies_configured: number;
+  unconfigured_tickets: number;
+  first_response: DashboardTargetMetrics;
+  resolution: DashboardTargetMetrics;
+}
+
+export interface DashboardResponse {
+  tenant_id: string;
+  evaluated_at: string;
+  schema_available: boolean;
+  status_counts: DashboardStatusCounts;
+  workload: DashboardWorkload;
+  sla_summary: DashboardSLASummary | null;
+  urgency_notice: string;
+  message?: string | null;
+}

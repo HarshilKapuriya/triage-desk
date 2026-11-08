@@ -35,6 +35,7 @@ from app.repositories.auth import get_user_by_email
 import app.repositories.duplicates as dup_repo
 import app.repositories.kb as kb_repo
 import app.repositories.sla as sla_repo
+import app.repositories.dashboard as dashboard_repo
 from app.ml.chunking import chunk_article_text, ChunkingError
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
 from app.repositories.ml import get_prediction_with_model_for_ticket
@@ -1541,4 +1542,73 @@ async def close_ticket_endpoint(
             "first_response_at": updated["first_response_at"].isoformat() if updated["first_response_at"] else None,
             "resolved_at": updated["resolved_at"].isoformat() if updated["resolved_at"] else None,
         },
+    }
+
+
+@router.get("/dashboard")
+def get_dashboard_endpoint(
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Retrieve tenant operational dashboard metrics snapshot."""
+    response.headers["Cache-Control"] = "no-store"
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        metrics = dashboard_repo.get_tenant_dashboard_metrics(
+            conn=conn,
+            tenant_id=principal.tenant_id,
+            evaluated_at=now,
+        )
+
+    def format_target_metrics(target: dashboard_repo.TargetMetrics) -> dict[str, Any]:
+        return {
+            "eligible_total": target.eligible_total,
+            "data_quality_issues": target.data_quality_issues,
+            "valid_eligible_total": target.valid_eligible_total,
+            "completed_on_time": target.completed_on_time,
+            "completed_late": target.completed_late,
+            "completed_total": target.completed_total,
+            "incomplete_before_deadline": target.incomplete_before_deadline,
+            "incomplete_due_now": target.incomplete_due_now,
+            "incomplete_overdue": target.incomplete_overdue,
+            "incomplete_total": target.incomplete_total,
+            "completed_timeliness_rate": target.completed_timeliness_rate,
+            "incomplete_not_overdue_rate": target.incomplete_not_overdue_rate,
+        }
+
+    sla_summary_payload: dict[str, Any] | None = None
+    if metrics.sla_summary is not None:
+        sla_summary_payload = {
+            "policies_configured": metrics.sla_summary.policies_configured,
+            "unconfigured_tickets": metrics.sla_summary.unconfigured_tickets,
+            "first_response": format_target_metrics(metrics.sla_summary.first_response),
+            "resolution": format_target_metrics(metrics.sla_summary.resolution),
+        }
+
+    return {
+        "tenant_id": str(metrics.tenant_id),
+        "evaluated_at": metrics.evaluated_at.isoformat(),
+        "schema_available": metrics.schema_available,
+        "status_counts": {
+            "new": metrics.status_counts.new,
+            "open": metrics.status_counts.open,
+            "pending": metrics.status_counts.pending,
+            "resolved": metrics.status_counts.resolved,
+            "closed": metrics.status_counts.closed,
+            "total": metrics.status_counts.total,
+        },
+        "workload": {
+            "open": metrics.open_workload,
+            "completed": metrics.completed_workload,
+            "total": metrics.status_counts.total,
+            "scope_label": "All-time tenant workload",
+        },
+        "sla_summary": sla_summary_payload,
+        "urgency_notice": (
+            "Rules-based operational urgency based on elapsed calendar time. "
+            "Does not represent a trained statistical SLA risk model or calibrated breach probability."
+        ),
+        "message": metrics.message,
     }

@@ -292,6 +292,11 @@ Triage Desk enforces credential isolation depending on the operation:
 - `GET /browser-api/tickets`: Paginated ticket list with ML predictions and accurate processing status (`queued`, `processing`, `retry_scheduled`, `completed`, `failed`, `not_found`).
 - `POST /browser-api/tickets`: Submit new ticket from browser and enqueue background worker job.
 - `GET /browser-api/tickets/{id}`: Ticket detail with sanitized processing status, refresh capability, and ML prediction diagnostics.
+- `GET /browser-api/dashboard`: All-time tenant operational workload and deterministic SLA target metrics snapshot.
+- `GET /browser-api/sla/policies`: List tenant SLA policies.
+- `POST /browser-api/sla/policies`: Create or update tenant SLA policy by priority.
+- `DELETE /browser-api/sla/policies/{priority}`: Delete tenant SLA policy for priority.
+- `GET /browser-api/tickets/{id}/sla`: Deterministic SLA evaluation for a ticket.
 
 ---
 
@@ -397,6 +402,11 @@ python -m pytest tests/test_isolation.py -v
   - *Audit Log Conformance*: Strictly conforms to migration 001 schema (`tenant_id`, `actor`, `action`, `at`); omits complaint text, subjects, bodies, or sensitive user data.
   - *Frontend Implementation*: Added admin-only SLA Policies modal (`SlaPoliciesModal.tsx`), Header management button, dedicated "SLA Target & Timeliness" card on ticket detail view, and "Agent Lifecycle Actions" bar with interactive mutation controls, disabled explanations, and in-flight request discarding.
   - *Database Integration Safety*: `tests/test_sla_endpoints_db.py` contains a strict guard requiring a local disposable PostgreSQL instance (cleanly skipped in environments without local Postgres, avoiding hosted Supabase).
+- **Phase 5 Slice 3 Tenant Operational Dashboard (`pytest tests/test_dashboard_unit.py -v`)**: 7 passed, 0 failed.
+  - *Offline Test Coverage*: Verified single set-based SQL aggregation across tenant tickets (`app.repositories.dashboard.get_tenant_dashboard_metrics`); open workload derivation (`new + open + pending`); completion derivation matching pure evaluator (`first_response_at`/`resolved_at` timestamps, not ticket status); exact deadline partitioning with separate `incomplete_due_now` ("Due now" at `now == due_at`) and `incomplete_before_deadline`; data quality issue detection (`created_at > now`, `completed_at < created_at`, `completed_at > now`) with exclusion from timeliness rates; explicit denominators with zero-denominator rate returns as `None` (rendered "Not available"); empty tenant and unconfigured policy coverage; savepoint rollback with status-only fallback query when `sla_policies` schema is missing; authenticated endpoint `GET /browser-api/dashboard` deriving tenant identity strictly from browser session principal; and `Cache-Control: no-store`.
+  - *Frontend Implementation*: Added `DashboardView.tsx`, `/dashboard` route, Header navigation button, separate loading/error/empty/schema-unavailable/unconfigured states, workload and status breakdown cards, independent First Response and Resolution target cards, and admin-only policy configuration shortcut. Discards stale responses across navigation and auto-refreshes on policy mutation.
+  - *Database Integration Safety*: `tests/test_dashboard_db.py` contains a strict guard requiring an established local disposable PostgreSQL instance (`1 skipped` cleanly when unconfigured, avoiding hosted database access). Proves actual PostgreSQL lateral-join aggregation, policy precedence, exact deadlines, evaluator parity, and strict two-tenant isolation without data leakage.
+  - *Explicit Phase 5 Limitations*: All-time aggregation cost grows with tenant data volume; schema definitions define indexes `idx_tickets_tenant_id_id`, `idx_tickets_tenant_status_created_at`, `idx_sla_policies_tenant_id_id`, and constraint `uq_sla_policies_tenant_priority`. Rules-based urgency bands are descriptive operational indicators, not statistical breach probabilities. Supervised predictive SLA breach risk modeling and live two-tenant dashboard demonstration remain separate unfinished Phase 5 items.
 
 
 

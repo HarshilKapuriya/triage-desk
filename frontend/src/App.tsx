@@ -9,9 +9,10 @@ import { TicketDetailView } from './components/TicketDetailView';
 import { CreateTicketView } from './components/CreateTicketView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { SlaPoliciesModal } from './components/SlaPoliciesModal';
+import { DashboardView } from './components/DashboardView';
 import './App.css';
 
-type ViewMode = 'login' | 'tickets' | 'ticket-detail' | 'new-ticket' | 'knowledge-base';
+type ViewMode = 'login' | 'tickets' | 'ticket-detail' | 'new-ticket' | 'knowledge-base' | 'dashboard';
 
 export const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -44,6 +45,11 @@ export const App = () => {
     if (path === '/kb' || path === '/knowledge-base') {
       setSelectedTicketId(null);
       setView('knowledge-base');
+      return;
+    }
+    if (path === '/dashboard') {
+      setSelectedTicketId(null);
+      setView('dashboard');
       return;
     }
     const match = path.match(/^\/tickets\/([a-zA-Z0-9-]+)$/);
@@ -169,6 +175,12 @@ export const App = () => {
     window.history.pushState({}, '', '/kb');
   };
 
+  const handleNavigateDashboard = () => {
+    setSelectedTicketId(null);
+    setView('dashboard');
+    window.history.pushState({}, '', '/dashboard');
+  };
+
   const handlePageChange = (newPage: number) => {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
@@ -184,6 +196,7 @@ export const App = () => {
         }}
         currentView={view}
         onNavigateKB={handleNavigateKB}
+        onNavigateDashboard={handleNavigateDashboard}
         onOpenSlaModal={() => setIsSlaModalOpen(true)}
       />
 
@@ -195,6 +208,14 @@ export const App = () => {
         )}
 
         {!loading && !user && <LoginView onLoginSuccess={handleLoginSuccess} />}
+
+        {user && view === 'dashboard' && (
+          <DashboardView
+            user={user}
+            onOpenSlaModal={() => setIsSlaModalOpen(true)}
+            slaPolicyVersion={slaPolicyVersion}
+          />
+        )}
 
         {user && view === 'tickets' && (
           <TicketsListView

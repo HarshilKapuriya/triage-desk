@@ -11,6 +11,7 @@ import {
   SLAPolicyMutationResponse,
   TicketSLAResponse,
   LifecycleActionResponse,
+  DashboardResponse,
 } from './types';
 
 class ApiClient {
@@ -240,6 +241,10 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ csrf_token: this.csrfToken }),
     });
+  }
+
+  async getDashboard(signal?: AbortSignal): Promise<DashboardResponse> {
+    return this.request<DashboardResponse>('/browser-api/dashboard', { signal });
   }
 }
 

@@ -6,6 +6,7 @@ interface HeaderProps {
   onNavigateHome: () => void;
   currentView?: string;
   onNavigateKB?: () => void;
+  onNavigateDashboard?: () => void;
   onOpenSlaModal?: () => void;
 }
 
@@ -15,6 +16,7 @@ export const Header = ({
   onNavigateHome,
   currentView,
   onNavigateKB,
+  onNavigateDashboard,
   onOpenSlaModal,
 }: HeaderProps) => {
   return (
@@ -28,6 +30,25 @@ export const Header = ({
 
         {user && onNavigateKB && (
           <nav style={{ display: 'flex', gap: '8px' }}>
+            {onNavigateDashboard && (
+              <button
+                type="button"
+                onClick={onNavigateDashboard}
+                style={{
+                  background: currentView === 'dashboard' ? 'var(--bg-subtle)' : 'none',
+                  border: '1px solid',
+                  borderColor: currentView === 'dashboard' ? 'var(--border-color)' : 'transparent',
+                  borderRadius: '4px',
+                  padding: '4px 10px',
+                  fontSize: '13px',
+                  fontWeight: currentView === 'dashboard' ? 600 : 400,
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                }}
+              >
+                Dashboard
+              </button>
+            )}
             <button
               type="button"
               onClick={onNavigateHome}
