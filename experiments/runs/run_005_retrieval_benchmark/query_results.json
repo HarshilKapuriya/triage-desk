@@ -1,0 +1,1986 @@
+[
+  {
+    "query_id": "q01",
+    "subject": "ATM deposit delay triggered overdraft fees",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 0
+      },
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 1
+      }
+    ],
+    "relevant_count": 2,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.6909,
+        "is_relevant": true,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.5166,
+        "is_relevant": true,
+        "excerpt_snippet": "Under standard synthetic bank guidelines, automated teller machine (ATM) cash and check deposits submitted before 5:00 P..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.403,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3789,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.3712,
+        "is_relevant": false,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      }
+    ],
+    "recall_at_1": 0.5,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q02",
+    "subject": "Deposit hold cutoff time inquiry",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-001",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.6957,
+        "is_relevant": true,
+        "excerpt_snippet": "Under standard synthetic bank guidelines, automated teller machine (ATM) cash and check deposits submitted before 5:00 P..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.446,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.4364,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3879,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3834,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q03",
+    "subject": "Third overdraft fee refund request",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 1
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.735,
+        "is_relevant": true,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.3573,
+        "is_relevant": false,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.3442,
+        "is_relevant": false,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3358,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3117,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q04",
+    "subject": "Unauthorized debit card point of sale transactions",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.6981,
+        "is_relevant": true,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.5486,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.4042,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3442,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3207,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q05",
+    "subject": "Provisional credit delay on debit dispute",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.5053,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.4941,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.4876,
+        "is_relevant": true,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3983,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3564,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 0.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 0.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 0.3333333333333333,
+    "first_relevant_rank": 3
+  },
+  {
+    "query_id": "q06",
+    "subject": "Dispute reported after monthly statement arrived",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.6382,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.6231,
+        "is_relevant": true,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.48,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.4136,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3773,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 0.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 0.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 0.5,
+    "first_relevant_rank": 2
+  },
+  {
+    "query_id": "q07",
+    "subject": "Urgent cancellation of domestic wire transfer",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.6747,
+        "is_relevant": true,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.4068,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.3699,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.3635,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3577,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q08",
+    "subject": "International remittance cancellation within 30 minutes",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.578,
+        "is_relevant": true,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.4139,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.3292,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.3024,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.2925,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q09",
+    "subject": "Wire recall fee on completed transfer",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.725,
+        "is_relevant": true,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3948,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.39,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3312,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3297,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q10",
+    "subject": "Billing error on credit card statement for undelivered items",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.7903,
+        "is_relevant": true,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.5046,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3899,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3593,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.3366,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q11",
+    "subject": "Finance charges accrued during ongoing card dispute",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.6102,
+        "is_relevant": true,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.4272,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3786,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.372,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.3398,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q12",
+    "subject": "Chargeback proof of merchant contact requirement",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.584,
+        "is_relevant": true,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3827,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3715,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3013,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.3011,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q13",
+    "subject": "Annual escrow shortage payment options",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.6557,
+        "is_relevant": true,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.2997,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.2789,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.2174,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.1785,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q14",
+    "subject": "Escrow surplus refund check timeline",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.6222,
+        "is_relevant": true,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3608,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3077,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3059,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.267,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q15",
+    "subject": "Mortgage escrow cushion requirement",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.7897,
+        "is_relevant": true,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3549,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3353,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.235,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.2208,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q16",
+    "subject": "Car loan payment grace period before late fee",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.7022,
+        "is_relevant": true,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.4067,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.3806,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.3481,
+        "is_relevant": false,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3454,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q17",
+    "subject": "Excessive late charge calculation on vehicle loan",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.6164,
+        "is_relevant": true,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.462,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3778,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-005",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+        "similarity_score": 0.3358,
+        "is_relevant": false,
+        "excerpt_snippet": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate p..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.321,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q18",
+    "subject": "Received Notice of Default and Right to Cure on car",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.6612,
+        "is_relevant": true,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3722,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.36,
+        "is_relevant": false,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3451,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.3031,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q19",
+    "subject": "Fraudulent loan opened in my name identity theft",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.6375,
+        "is_relevant": true,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3783,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3688,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3107,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.3106,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q20",
+    "subject": "Police report submission for credit bureau blocking",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.7336,
+        "is_relevant": true,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.4431,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3476,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.2981,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.2889,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q21",
+    "subject": "Unfreeze accounts after identity theft clearance",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-007",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+        "similarity_score": 0.6631,
+        "is_relevant": true,
+        "excerpt_snippet": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit execut..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3875,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3862,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3792,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3647,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q22",
+    "subject": "Phone request to cancel personal check payment",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.7269,
+        "is_relevant": true,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.407,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3826,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3489,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3229,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q23",
+    "subject": "Stop payment order expiration and renewal",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.6157,
+        "is_relevant": true,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.4488,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.4137,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.3311,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3281,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q24",
+    "subject": "Stop payment requested on bank cashier's check",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.6716,
+        "is_relevant": true,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.394,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-001",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3683,
+        "is_relevant": false,
+        "excerpt_snippet": "Under standard synthetic bank guidelines, automated teller machine (ATM) cash and check deposits submitted before 5:00 P..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-003",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+        "similarity_score": 0.3647,
+        "is_relevant": false,
+        "excerpt_snippet": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reser..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3272,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q25",
+    "subject": "Monthly inactivity charge on checking account",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.6273,
+        "is_relevant": true,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.432,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-004",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+        "similarity_score": 0.4106,
+        "is_relevant": false,
+        "excerpt_snippet": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliv..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3941,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.3605,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q26",
+    "subject": "Notice of unclaimed property escheatment to state",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.7393,
+        "is_relevant": true,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.4276,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.4067,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3926,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.3808,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q27",
+    "subject": "Reactivate dormant account to avoid fees",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.6621,
+        "is_relevant": true,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.4566,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.3909,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.3745,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.3656,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q28",
+    "subject": "Early withdrawal penalty calculation on 24-month CD",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.7991,
+        "is_relevant": true,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.5177,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.43,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.4225,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-002",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+        "similarity_score": 0.4058,
+        "is_relevant": false,
+        "excerpt_snippet": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering ..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q29",
+    "subject": "Maturity grace period window to withdraw CD funds",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 0
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.8142,
+        "is_relevant": true,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.6632,
+        "is_relevant": false,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.4123,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3926,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-008",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+        "similarity_score": 0.3154,
+        "is_relevant": false,
+        "excerpt_snippet": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dolla..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  },
+  {
+    "query_id": "q30",
+    "subject": "CD automatic rollover rate after maturity",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 1
+      }
+    ],
+    "relevant_count": 1,
+    "retrieved_top_5": [
+      {
+        "rank": 1,
+        "article_id": "kb-art-010",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.8467,
+        "is_relevant": true,
+        "excerpt_snippet": "If no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls ..."
+      },
+      {
+        "rank": 2,
+        "article_id": "kb-art-010",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+        "similarity_score": 0.6263,
+        "is_relevant": false,
+        "excerpt_snippet": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled..."
+      },
+      {
+        "rank": 3,
+        "article_id": "kb-art-006",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+        "similarity_score": 0.4548,
+        "is_relevant": false,
+        "excerpt_snippet": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calen..."
+      },
+      {
+        "rank": 4,
+        "article_id": "kb-art-009",
+        "chunk_index": 0,
+        "article_title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+        "similarity_score": 0.3608,
+        "is_relevant": false,
+        "excerpt_snippet": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authen..."
+      },
+      {
+        "rank": 5,
+        "article_id": "kb-art-001",
+        "chunk_index": 1,
+        "article_title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+        "similarity_score": 0.2718,
+        "is_relevant": false,
+        "excerpt_snippet": "If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may r..."
+      }
+    ],
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "hit_rate_at_1": 1.0,
+    "hit_rate_at_3": 1.0,
+    "hit_rate_at_5": 1.0,
+    "reciprocal_rank": 1.0,
+    "first_relevant_rank": 1
+  }
+]

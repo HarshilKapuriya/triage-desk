@@ -1,0 +1,336 @@
+[
+  {
+    "id": "q01",
+    "subject": "ATM deposit delay triggered overdraft fees",
+    "body": "I deposited a check at the branch ATM on Friday evening after 6pm. The funds weren't available until Monday, which caused two of my automatic bill payments to bounce and incur non-sufficient funds fees. Can I get these overdraft charges waived since it was caused by the ATM processing time?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 0
+      },
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 1
+      }
+    ]
+  },
+  {
+    "id": "q02",
+    "subject": "Deposit hold cutoff time inquiry",
+    "body": "What is the daily cutoff time for cash deposits made at the automated teller machine to be credited on the same business day? I made a deposit right around 5 PM and need to know when the hold clears.",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q03",
+    "subject": "Third overdraft fee refund request",
+    "body": "I had another ATM deposit delay this month and was hit with an overdraft fee. Your representative already refunded two fees for me earlier this year. Can you approve a third waiver under the policy?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-001",
+        "chunk_index": 1
+      }
+    ]
+  },
+  {
+    "id": "q04",
+    "subject": "Unauthorized debit card point of sale transactions",
+    "body": "Someone used my stolen debit card at a gas station yesterday for $350. I just noticed the fraudulent charge and want to dispute it immediately. How much am I liable for since I reported it within 24 hours?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q05",
+    "subject": "Provisional credit delay on debit dispute",
+    "body": "It has been over two weeks since I filed an electronic funds transfer dispute for fraudulent charges on my checking account, but I have not received provisional credit yet. When is the bank required to issue temporary credit during an investigation?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q06",
+    "subject": "Dispute reported after monthly statement arrived",
+    "body": "I just reviewed my bank statement from last month and noticed three fraudulent debit card charges that occurred 3 weeks ago. What is my maximum liability under the dispute rules if it was reported within 60 days of the statement?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-002",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q07",
+    "subject": "Urgent cancellation of domestic wire transfer",
+    "body": "I authorized a Fedwire transfer to an escrow title company earlier this morning, but I realized the account number was incorrect. Can the bank stop the wire transfer or is it already irrevocable?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q08",
+    "subject": "International remittance cancellation within 30 minutes",
+    "body": "I just sent an international money remittance transfer to my family overseas 15 minutes ago. Due to an emergency I need to cancel the transaction. Am I eligible for a full refund of the transfer fee and principal?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q09",
+    "subject": "Wire recall fee on completed transfer",
+    "body": "The recipient bank credited my domestic wire to the wrong business account. How much is the fee to submit a formal Wire Recall Request and does the other institution have to agree?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-003",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q10",
+    "subject": "Billing error on credit card statement for undelivered items",
+    "body": "I purchased electronics on my credit card that were never shipped by the merchant. The merchant is unresponsive. How many days do I have to submit a formal billing error notice under the credit card dispute rules?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q11",
+    "subject": "Finance charges accrued during ongoing card dispute",
+    "body": "I am disputing a $450 erroneous charge on my credit card. Does the bank require me to pay the disputed balance and finance charges while the investigation is underway, or can they be withheld?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q12",
+    "subject": "Chargeback proof of merchant contact requirement",
+    "body": "I need to file a credit card chargeback for a damaged sofa. What supporting documentation do I need to provide showing I attempted to contact the vendor before submitting my claim?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-004",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q13",
+    "subject": "Annual escrow shortage payment options",
+    "body": "My annual mortgage statement shows an escrow shortage of $1,800 due to county property tax increases. Can I spread this shortage over my next 12 monthly payments instead of paying all at once?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q14",
+    "subject": "Escrow surplus refund check timeline",
+    "body": "My latest escrow analysis statement calculated a surplus balance of $320 in my property tax and hazard insurance account. When should I expect the refund check to be mailed?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q15",
+    "subject": "Mortgage escrow cushion requirement",
+    "body": "Why does my mortgage servicer keep extra funds in my escrow account? How many months of tax and insurance disbursements are required as a minimum cushion under RESPA?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-005",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q16",
+    "subject": "Car loan payment grace period before late fee",
+    "body": "My monthly auto loan installment was due on the 5th of the month. How many calendar days of grace period do I have before a late fee is added to my vehicle financing balance?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q17",
+    "subject": "Excessive late charge calculation on vehicle loan",
+    "body": "The bank assessed a $45 late fee on my auto loan payment. Isn't there a maximum dollar cap or percentage limit on late fees for automobile installments?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q18",
+    "subject": "Received Notice of Default and Right to Cure on car",
+    "body": "I received a formal letter stating my car loan is 30 days delinquent and subject to repossession. What is this Right to Cure notice and how long do I have to bring the account current?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-006",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q19",
+    "subject": "Fraudulent loan opened in my name identity theft",
+    "body": "Someone used my Social Security number to fraudulently open a personal loan account. How quickly can the bank freeze all accounts to prevent any more fraudulent borrowing under my identity?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q20",
+    "subject": "Police report submission for credit bureau blocking",
+    "body": "I submitted an FTC Identity Theft Report and police report regarding fraudulent accounts opened at your institution. How many days does the bank have under FCRA Section 605B to notify the credit bureaus to block this information?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q21",
+    "subject": "Unfreeze accounts after identity theft clearance",
+    "body": "My checking account was placed under a protective fraud freeze following suspected identity theft. What affidavit or documentation is required to clear the fraud alert and discharge the fraudulent debts?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-007",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q22",
+    "subject": "Phone request to cancel personal check payment",
+    "body": "I called customer service this morning to put a stop payment on check #1042 for $600. How long is this verbal telephone stop payment order valid before I must confirm it in writing?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q23",
+    "subject": "Stop payment order expiration and renewal",
+    "body": "I placed a written stop payment order on a check 5 months ago and the contractor still has not returned it. Does the written stop order expire at 6 months and can I renew it?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q24",
+    "subject": "Stop payment requested on bank cashier's check",
+    "body": "I lost an official cashier's check that was issued by the teller last week. Can I submit a standard $30 stop payment request on a cashier's check or certified check?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-008",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q25",
+    "subject": "Monthly inactivity charge on checking account",
+    "body": "I have not logged into or used my secondary savings account for over a year and noticed a recurring $10 monthly charge. Why is this inactivity maintenance fee being charged?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q26",
+    "subject": "Notice of unclaimed property escheatment to state",
+    "body": "I received a certified letter warning that my dormant bank account balance will be remitted to the state unclaimed property division. How long does an account have to be inactive before it is escheated?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q27",
+    "subject": "Reactivate dormant account to avoid fees",
+    "body": "My account was classified as inactive after 12 months with no transactions. What customer-initiated activity is needed to restore active status and stop the dormancy fees?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-009",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q28",
+    "subject": "Early withdrawal penalty calculation on 24-month CD",
+    "body": "I need to withdraw funds from my 2-year Certificate of Deposit before the maturity date to cover a medical bill. How many days of simple interest will be forfeited as a penalty?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q29",
+    "subject": "Maturity grace period window to withdraw CD funds",
+    "body": "My 1-year certificate of deposit reaches maturity next Tuesday. How many days of a grace period do I have to withdraw the principal and interest before it automatically rolls over?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "id": "q30",
+    "subject": "CD automatic rollover rate after maturity",
+    "body": "I missed the 7-day grace period on my maturing CD. What interest rate does the certificate renew at when it automatically rolls over into a new term?",
+    "relevant_chunks": [
+      {
+        "article_id": "kb-art-010",
+        "chunk_index": 1
+      }
+    ]
+  }
+]

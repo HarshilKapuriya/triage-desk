@@ -1,0 +1,52 @@
+[
+  {
+    "id": "kb-art-001",
+    "title": "[SYNTHETIC DEMO] ATM Deposit Hold and Overdraft Fee Waiver Policy",
+    "body": "Under standard synthetic bank guidelines, automated teller machine (ATM) cash and check deposits submitted before 5:00 PM local time on an ordinary business day are credited on the same calendar day. Deposits made after 5:00 PM local time, or deposits initiated on weekends and recognized banking holidays, begin processing on the following business day. When an unexpected technical hold, mechanical jam, or network verification delay occurs at an automated teller terminal, customer funds availability may be temporarily restricted beyond standard clearing windows. Customers should retain their machine-printed transaction receipt showing the terminal identifier, timestamp, and envelope or bill scan count until all deposited funds are fully posted to the primary account ledger. If an unannounced deposit hold delays account crediting and triggers non-sufficient funds (NSF) charges, customers may request a temporary fee waiver.\n\nCustomer service representatives are authorized to reverse up to two overdraft fees per calendar year when the delay was caused by machine processing errors. Overdraft fee waiver requests exceeding the annual two-reversal limit require supervisory escalation and branch manager approval. When submitting a waiver request for supervisory review, the representative must attach the incident reference number from the ATM maintenance ticket and verify that the customer account was in good standing prior to the delayed deposit event."
+  },
+  {
+    "id": "kb-art-002",
+    "title": "[SYNTHETIC DEMO] Electronic Funds Transfer and Unauthorized Debit Card Dispute Policy",
+    "body": "Under synthetic banking guidelines adhering to Regulation E, cardholders must notify the bank promptly upon discovering lost or stolen debit cards or unauthorized point-of-sale debit charges. If reported within 2 business days of learning of the loss, maximum customer liability is limited to $50. If reported after 2 business days but within 60 calendar days of the periodic statement transmittal, liability is capped at $500.\n\nFor unauthorized electronic fund transfer investigations that cannot be completed within 10 business days, the institution issues provisional credit to the cardholder account while investigating and immediately reissues a new replacement debit card with unique security credentials."
+  },
+  {
+    "id": "kb-art-003",
+    "title": "[SYNTHETIC DEMO] Wire Transfer Cancellation and Recall Procedures",
+    "body": "Domestic Fedwire funds transfers are executed in real time and are irrevocable once transmitted across the Federal Reserve wire network. An outbound wire cancellation request can only be honored prior to transmission. Once funds have been credited to the beneficiary financial institution, recovery requires an official Wire Recall Request subject to a non-refundable $35 recall processing fee and receiving institution consent.\n\nInternational consumer remittance transfers may be cancelled for a full refund of principal and transfer fees if the cancellation request is received within 30 minutes of payment authorization, provided the funds have not already been picked up or deposited into the foreign recipient account."
+  },
+  {
+    "id": "kb-art-004",
+    "title": "[SYNTHETIC DEMO] Credit Card Billing Error Inquiries and Merchant Chargebacks",
+    "body": "Cardholders disputing an inaccurate charge, unauthorized recurring credit transaction, or failure of a merchant to deliver merchandise must submit a formal written billing error notice within 60 calendar days after the date the first periodic billing statement reflecting the disputed item was issued. During the investigation, the disputed amount and related finance charges may be withheld from payment without adverse credit reporting.\n\nChargeback requests against merchants require supporting evidence, including order confirmation, cancellation emails, proof of merchant contact attempted at least 15 calendar days prior to claim submission, and return tracking documentation for physical merchandise."
+  },
+  {
+    "id": "kb-art-005",
+    "title": "[SYNTHETIC DEMO] Mortgage Escrow Account Analysis, Shortages, and Surplus Refunds",
+    "body": "The mortgage servicing department conducts an annual escrow account analysis pursuant to RESPA guidelines to calculate projected property taxes, homeowner hazard insurance premiums, and flood insurance payments. A required minimum cushion equal to one-sixth (two months) of estimated annual escrow disbursements is maintained.\n\nIf the annual analysis reveals an escrow shortage, the borrower is automatically offered the option to repay the shortage as a single lump-sum payment or spread the shortage equally across the subsequent 12 monthly mortgage statements. If an escrow surplus exceeds $50 and the borrower payments are current, a refund check is mailed within 30 calendar days."
+  },
+  {
+    "id": "kb-art-006",
+    "title": "[SYNTHETIC DEMO] Auto Loan Payment Grace Period, Late Charges, and Default Notices",
+    "body": "Monthly vehicle installment loan payments are due on the designated monthly due date, accompanied by a standard 10-calendar-day grace period. Payments received after the 10-day grace period expires incur a late charge equal to the lesser of 5% of the unpaid installment amount or $25.00.\n\nIf an automobile financing account enters 30 consecutive days of delinquency, the servicer issues a formal Notice of Default and Right to Cure. If the default is not cured within the statutory notice period, the vehicle may be scheduled for repossession in accordance with applicable personal property collateral statutes."
+  },
+  {
+    "id": "kb-art-007",
+    "title": "[SYNTHETIC DEMO] Identity Theft Account Lockdown, Fraud Affidavit, and Credit Bureau Blocking",
+    "body": "If an account has been compromised or opened fraudulently via synthetic identity theft, the fraud prevention unit executes an immediate protective security freeze on all linked checking, savings, and loan accounts to prevent further unauthorized credit extension or asset dissipation.\n\nTo facilitate permanent trade-line deletion and debt discharge, the victim must submit a completed Identity Theft Affidavit accompanied by an official police report or FTC Identity Theft Report. Under FCRA Section 605B compliance rules, the bank must notify consumer reporting agencies to block fraudulent information within 4 business days of receiving valid verification documentation."
+  },
+  {
+    "id": "kb-art-008",
+    "title": "[SYNTHETIC DEMO] Personal Check Stop Payment Order Terms and Expiration Rules",
+    "body": "An account owner may place a stop payment order on an uncashed personal check by providing the check number, exact dollar amount, date, and payee name. An oral stop payment order placed via telephone or online chat remains valid for exactly 14 calendar days unless confirmed in writing.\n\nA written stop payment order remains in effect for 6 months and can be renewed in writing before expiration. Stop payment orders cannot be accepted on cashier checks, certified checks, or money orders once issued by the institution. A standard stop payment service fee of $30 applies to each check request."
+  },
+  {
+    "id": "kb-art-009",
+    "title": "[SYNTHETIC DEMO] Dormant Deposit Account Inactivity Fees and State Escheatment",
+    "body": "A retail checking or savings account is classified as inactive if no customer-initiated deposits, withdrawals, or authenticated online logins occur for 12 consecutive months. Inactive accounts incur an inactivity maintenance fee of $10 per month until activity resumes or balance is depleted.\n\nAccounts with zero customer contact for 3 consecutive years enter unclaimed property review. Sixty days prior to statutory escheatment, a certified written notice is dispatched to the customer last known mailing address. If no response is received, remaining balances are remitted to the state department of revenue in compliance with state unclaimed property statutes."
+  },
+  {
+    "id": "kb-art-010",
+    "title": "[SYNTHETIC DEMO] Certificate of Deposit (CD) Early Withdrawal Penalties and Grace Period",
+    "body": "Time deposit accounts and Certificates of Deposit (CDs) require principal funds to remain on deposit until the scheduled maturity date stated on the deposit certificate. If principal balances are withdrawn prior to the agreed maturity date, an early withdrawal penalty is assessed against accrued interest and principal. For CD terms of twelve months or less, the early withdrawal penalty is ninety days of simple interest calculated at the initial contract rate. For CD terms greater than twelve months, the early withdrawal penalty is one hundred eighty days of simple interest. Upon reaching the scheduled maturity date, certificate holders enter a seven-calendar-day grace period during which funds may be withdrawn, deposited, or transferred to another account without incurring any penalty.\n\nIf no customer instructions are received before the seven-calendar-day grace period expires, the CD automatically rolls over into a new certificate with an identical term length. Automatically renewed certificates earn interest at the prevailing market rate published on the rollover date, which may differ from the yield of the expired certificate. Account holders may elect non-renewal through online banking or customer support at any point prior to maturity."
+  }
+]

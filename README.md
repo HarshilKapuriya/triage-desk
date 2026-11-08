@@ -327,6 +327,15 @@ python -m pytest tests/test_embedding_jobs_unit.py -v
 # Run tenant-scoped similar-ticket suggestions unit tests (offline, fakes/mocks)
 python -m pytest tests/test_similar_tickets_unit.py -v
 
+# Run Knowledge-Base unit tests and chunking tests (offline, fakes/mocks)
+python -m pytest tests/test_kb_unit.py tests/test_chunking_unit.py -v
+
+# Run Phase 4 Knowledge-Base retrieval benchmark unit tests (offline, artifact-free)
+python -m pytest tests/test_retrieval_benchmark_unit.py -v
+
+# Run Phase 4 Knowledge-Base offline retrieval quality evaluation benchmark
+python scripts/evaluate_retrieval.py
+
 # Run embedding database integration tests (strictly requires local disposable PostgreSQL; skips on hosted DBs)
 python -m pytest tests/test_embedding_jobs_db.py tests/test_similar_tickets_db.py -v
 
@@ -367,6 +376,13 @@ python -m pytest tests/test_isolation.py -v
   - *Offline Test Coverage*: Verified exact cosine-similarity retrieval contract, deterministic ordering by cosine distance ASC and ticket ID ASC, strict tenant and model_name/model_version scoping, source ticket exclusion, limit clamping [1, 50], and score clamping [-1.0, 1.0]. Verified browser API endpoint `GET /browser-api/tickets/{ticket_id}/similar`: 401 unauthenticated JSON rejection, 404 on invalid UUID / missing / cross-tenant tickets, distinct `embedding_status='not_ready'` when source ticket has no embedding (never shown as "no matches"), `embedding_status='ready'` with candidates when embeddings exist, and `Cache-Control: no-store`.
   - *Database Integration Safety*: `tests/test_similar_tickets_db.py` contains a strict disposability guard requiring an established local throwaway PostgreSQL instance (5 tests cleanly skipped in environments without local Postgres, avoiding hosted Supabase).
   - *UI State Contract*: Added "Similar tickets" card to ticket detail view, distinguishing loading, request error, not-ready embedding, zero matches, and candidate list with uncalibrated similarity scores.
+- **Phase 4 Knowledge-Base Feature (`pytest tests/test_kb_unit.py tests/test_chunking_unit.py -v`)**: 23 passed, 0 failed.
+  - *Offline Test Coverage*: Verified deterministic passage chunking, subword length bounds, overlap consistency, atomic article/chunks/jobs creation in a single transaction, and fair-polling worker integration.
+- **Phase 4 Knowledge-Base Retrieval Quality Benchmark (`pytest tests/test_retrieval_benchmark_unit.py -v` & `python scripts/evaluate_retrieval.py`)**: 33 unit tests passed, 0 failed.
+  - *Benchmark Execution*: Offline evaluation over frozen synthetic corpus (10 articles, 12 deterministic chunks, SHA-256: `18ae28b9f7a7ce7cb86eb9485ececf69e8fcc1c89491086ea107b3dfbe9cf59e`) and 30 labeled support queries (SHA-256: `314ebfdd88c667a2c1be50df109fe663127b56b8c14f1c854157f071eb524e8a`).
+  - *Macro Baseline Metrics*: Macro Recall@1 = 91.7%, Recall@3 = 100.0%, Recall@5 = 100.0%, Hit Rate@1 = 93.3%, Hit Rate@3 = 100.0%, Hit Rate@5 = 100.0%, MRR = 0.9611.
+  - *Full Evaluation Report*: Detailed analysis of sub-ranked queries, separated execution timings, and scope limitations documented in `RETRIEVAL_EVALUATION.md`. Run artifacts immutably archived under `experiments/runs/run_005_retrieval_benchmark/`.
+
 
 
 ### 2. Manual Browser Testing Record (2026-11-06)

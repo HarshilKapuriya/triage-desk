@@ -1,0 +1,29 @@
+{
+  "benchmark": "Phase 4 Knowledge-Base Retrieval Quality Benchmark",
+  "timestamp_utc": "2026-11-08T12:14:35Z",
+  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "dataset": {
+    "articles_filename": "articles.json",
+    "articles_sha256": "18ae28b9f7a7ce7cb86eb9485ececf69e8fcc1c89491086ea107b3dfbe9cf59e",
+    "queries_filename": "queries.json",
+    "queries_sha256": "314ebfdd88c667a2c1be50df109fe663127b56b8c14f1c854157f071eb524e8a",
+    "article_count": 10,
+    "query_count": 30,
+    "chunk_count": 12
+  },
+  "chunking": {
+    "max_title_chars": 300,
+    "max_article_chars": 20000,
+    "target_chunk_tokens": 160,
+    "overlap_tokens": 30
+  },
+  "timings_seconds": {
+    "validation_and_chunking_seconds": 0.029,
+    "corpus_embedding_seconds": 0.4333,
+    "query_embedding_seconds": 1.0466,
+    "ranking_evaluation_seconds": 0.0084,
+    "model_initialization_seconds": 0.4678
+  },
+  "timing_notice": "Timings reflect single-threaded local CPU execution on synthetic fixtures. They do NOT represent production database latency, connection pooling, or network roundtrips."
+}

@@ -1,0 +1,12 @@
+{
+  "query_count": 30,
+  "corpus_article_count": 10,
+  "corpus_chunk_count": 12,
+  "macro_recall_at_1": 0.9166666666666666,
+  "macro_recall_at_3": 1.0,
+  "macro_recall_at_5": 1.0,
+  "macro_hit_rate_at_1": 0.9333333333333333,
+  "macro_hit_rate_at_3": 1.0,
+  "macro_hit_rate_at_5": 1.0,
+  "mean_reciprocal_rank": 0.961111111111111
+}
