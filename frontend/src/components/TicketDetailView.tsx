@@ -19,6 +19,9 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
   const [similarLoading, setSimilarLoading] = useState(true);
   const [similarError, setSimilarError] = useState<string | null>(null);
 
+  const [rowPendingId, setRowPendingId] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<{ [ticketId: string]: string }>({});
+
   const currentTicketIdRef = useRef(ticketId);
   currentTicketIdRef.current = ticketId;
 
@@ -33,6 +36,8 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
     setError(null);
     setSimilarLoading(true);
     setSimilarError(null);
+    setRowPendingId(null);
+    setRowErrors({});
 
     try {
       const [ticketRes, similarRes] = await Promise.all([
@@ -78,6 +83,49 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
 
   const handleRefresh = () => {
     loadTicketData(ticketId, true);
+  };
+
+  const handleFeedback = async (similarTicketId: string, decision: 'confirmed' | 'rejected') => {
+    if (rowPendingId) return;
+    const originTicketId = ticketId;
+    setRowPendingId(similarTicketId);
+    setRowErrors((prev) => {
+      const next = { ...prev };
+      delete next[similarTicketId];
+      return next;
+    });
+
+    try {
+      const res = await api.submitSimilarFeedback(ticketId, similarTicketId, decision);
+      if (currentTicketIdRef.current !== originTicketId) {
+        return; // Discard response if user navigated to a different ticket
+      }
+      setSimilarData((prev) => {
+        if (!prev || currentTicketIdRef.current !== originTicketId || prev.ticket_id !== originTicketId) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((it) => {
+            if (it.ticket_id === similarTicketId) {
+              return {
+                ...it,
+                decision_status: res.decision,
+                reviewed_at: res.reviewed_at,
+              };
+            }
+            return it;
+          }),
+        };
+      });
+    } catch (err: unknown) {
+      if (currentTicketIdRef.current === originTicketId) {
+        const msg = err instanceof Error ? err.message : 'Failed to record decision.';
+        setRowErrors((prev) => ({ ...prev, [similarTicketId]: msg }));
+      }
+    } finally {
+      if (currentTicketIdRef.current === originTicketId) {
+        setRowPendingId(null);
+      }
+    }
   };
 
   if (loading) {
@@ -292,9 +340,12 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
                         <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600 }}>Subject</th>
-                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, width: '90px' }}>Status</th>
-                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '140px' }}>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, width: '80px' }}>Status</th>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '110px' }}>
                           Cosine Similarity
+                        </th>
+                        <th style={{ padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '200px' }}>
+                          Human Decision
                         </th>
                       </tr>
                     </thead>
@@ -341,6 +392,119 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
                               {item.similarity_score.toFixed(4)}
                             </span>
                           </td>
+                          <td style={{ padding: '10px', textAlign: 'right', verticalAlign: 'middle' }}>
+                            {item.decision_status === 'confirmed' ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    backgroundColor: '#e6f4ea',
+                                    color: '#137333',
+                                    border: '1px solid #ceead6',
+                                  }}
+                                  title={item.reviewed_at ? `Confirmed on ${new Date(item.reviewed_at).toISOString().replace('T', ' ').slice(0, 19)} UTC` : 'Confirmed duplicate'}
+                                >
+                                  ✓ Confirmed
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={rowPendingId === item.ticket_id}
+                                  onClick={() => handleFeedback(item.ticket_id, 'rejected')}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '2px 4px',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '11px',
+                                    textDecoration: 'underline',
+                                    cursor: rowPendingId === item.ticket_id ? 'not-allowed' : 'pointer',
+                                  }}
+                                  title="Change duplicate decision to Rejected"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : item.decision_status === 'rejected' ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    backgroundColor: 'var(--bg-subtle)',
+                                    color: 'var(--text-muted)',
+                                    border: '1px solid var(--border-color)',
+                                  }}
+                                  title={item.reviewed_at ? `Rejected on ${new Date(item.reviewed_at).toISOString().replace('T', ' ').slice(0, 19)} UTC` : 'Rejected match'}
+                                >
+                                  ✗ Rejected
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={rowPendingId === item.ticket_id}
+                                  onClick={() => handleFeedback(item.ticket_id, 'confirmed')}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '2px 4px',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '11px',
+                                    textDecoration: 'underline',
+                                    cursor: rowPendingId === item.ticket_id ? 'not-allowed' : 'pointer',
+                                  }}
+                                  title="Change duplicate decision to Confirmed"
+                                >
+                                  Confirm
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  disabled={rowPendingId === item.ticket_id}
+                                  onClick={() => handleFeedback(item.ticket_id, 'confirmed')}
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    opacity: rowPendingId === item.ticket_id ? 0.6 : 1,
+                                  }}
+                                >
+                                  {rowPendingId === item.ticket_id ? 'Saving...' : 'Confirm'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={rowPendingId === item.ticket_id}
+                                  onClick={() => handleFeedback(item.ticket_id, 'rejected')}
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    opacity: rowPendingId === item.ticket_id ? 0.6 : 1,
+                                  }}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                            {rowErrors[item.ticket_id] && (
+                              <div style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px', textAlign: 'right' }}>
+                                {rowErrors[item.ticket_id]}
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -348,7 +512,7 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
                 </div>
 
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', lineHeight: 1.4 }}>
-                  <strong>Notice</strong>: {similarData.notice}
+                  <strong>Notice</strong>: {similarData.notice} Human confirmation records a duplicate decision only; tickets are not merged or closed, and feedback does not alter model predictions automatically.
                 </p>
               </div>
             )}

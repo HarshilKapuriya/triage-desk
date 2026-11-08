@@ -76,6 +76,20 @@ export interface SimilarTicketItem {
   priority: string | null;
   created_at: string | null;
   similarity_score: number;
+  decision_status?: 'suggested' | 'confirmed' | 'rejected' | null;
+  reviewed_at?: string | null;
+}
+
+export interface SimilarFeedbackResponse {
+  link_id: string;
+  source_ticket_id: string;
+  target_ticket_id: string;
+  similarity_score: number;
+  model_name: string;
+  model_version: string;
+  decision: 'confirmed' | 'rejected';
+  reviewed_at: string | null;
+  notice: string;
 }
 
 export interface SimilarTicketsResponse {

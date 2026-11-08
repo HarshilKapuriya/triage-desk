@@ -37,6 +37,11 @@ class ContradictoryReviewStateError(ValueError):
     pass
 
 
+class MissingEmbeddingsError(ValueError):
+    """Raised when attempting to derive similarity for tickets lacking matching embeddings."""
+    pass
+
+
 ALLOWED_LINK_STATUSES = {"suggested", "confirmed", "rejected"}
 
 
@@ -78,6 +83,8 @@ class SimilarTicketCandidate:
     priority: str | None
     created_at: datetime
     similarity_score: float
+    decision_status: str | None = None
+    reviewed_at: datetime | None = None
 
 
 def _parse_vector(raw: Any) -> list[float]:
@@ -265,7 +272,7 @@ def find_similar_tickets_for_ticket(
         resolved_model_version = str(source_row["model_version"])
         source_vec_str = str(source_row["embedding"])
 
-        # 2. Retrieve top-k candidates in same tenant with matching model
+        # 2. Retrieve top-k candidates in same tenant with matching model and decision status
         candidate_query = """
             SELECT
                 t.id AS ticket_id,
@@ -274,9 +281,15 @@ def find_similar_tickets_for_ticket(
                 t.status,
                 t.priority,
                 t.created_at,
-                (1.0 - (te.embedding <=> %s::vector)) AS similarity_score
+                (1.0 - (te.embedding <=> %s::vector)) AS similarity_score,
+                dl.status AS decision_status,
+                dl.reviewed_at
             FROM ticket_embeddings te
             JOIN tickets t ON t.id = te.ticket_id AND t.tenant_id = te.tenant_id
+            LEFT JOIN duplicate_links dl
+              ON dl.tenant_id = te.tenant_id
+             AND dl.source_ticket_id = LEAST(te.ticket_id, %s)
+             AND dl.target_ticket_id = GREATEST(te.ticket_id, %s)
             WHERE te.tenant_id = %s
               AND te.model_name = %s
               AND te.model_version = %s
@@ -288,6 +301,8 @@ def find_similar_tickets_for_ticket(
             candidate_query,
             (
                 source_vec_str,
+                ticket_id,
+                ticket_id,
                 tenant_id,
                 resolved_model_name,
                 resolved_model_version,
@@ -307,6 +322,8 @@ def find_similar_tickets_for_ticket(
                 priority=r["priority"],
                 created_at=r["created_at"],
                 similarity_score=max(-1.0, min(1.0, float(r["similarity_score"]))),
+                decision_status=r.get("decision_status"),
+                reviewed_at=r.get("reviewed_at"),
             )
             for r in rows
         ]
@@ -539,3 +556,131 @@ def delete_duplicate_link(
     with conn.cursor() as cur:
         cur.execute(query, (tenant_id, link_id))
         return cur.rowcount > 0
+
+
+def record_duplicate_feedback(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id_1: uuid.UUID,
+    ticket_id_2: uuid.UUID,
+    decision: str,
+    reviewed_at: datetime | None = None,
+) -> DuplicateLinkRecord:
+    """Record operator confirm or reject feedback for a suggested duplicate ticket pair.
+
+    Rules:
+    1. Rejects self-links (ticket_id_1 == ticket_id_2) with SelfLinkError.
+    2. Decision must be 'confirmed' or 'rejected'.
+    3. Canonicalizes pair ordering (source_id = min(t1, t2), target_id = max(t1, t2)).
+    4. Server-derives similarity score and embedding model metadata from ticket_embeddings.
+       Never accepts client-supplied scores or model identity.
+    5. Sets reviewed_at = reviewed_at or NOW() when decision is recorded or changed.
+    6. Idempotent: repeated confirmations or rejections update decision and reviewed_at
+       atomically without creating duplicate rows or unhandled uniqueness conflicts.
+    """
+    if ticket_id_1 == ticket_id_2:
+        raise SelfLinkError(f"Cannot link ticket {ticket_id_1} to itself.")
+
+    normalized_decision = decision.strip().lower()
+    if normalized_decision not in ("confirmed", "rejected"):
+        raise InvalidStatusError(
+            f"Invalid decision '{decision}'. Must be 'confirmed' or 'rejected'."
+        )
+
+    effective_reviewed_at = reviewed_at or datetime.now(timezone.utc)
+    source_id = ticket_id_1 if ticket_id_1 < ticket_id_2 else ticket_id_2
+    target_id = ticket_id_2 if ticket_id_1 < ticket_id_2 else ticket_id_1
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        # 1. Check if a duplicate link already exists for this canonical pair
+        cur.execute(
+            """
+            SELECT id, tenant_id, source_ticket_id, target_ticket_id,
+                   similarity_score, model_name, model_version, status,
+                   created_at, reviewed_at
+            FROM duplicate_links
+            WHERE tenant_id = %s AND source_ticket_id = %s AND target_ticket_id = %s;
+            """,
+            (tenant_id, source_id, target_id),
+        )
+        existing = cur.fetchone()
+
+        if existing:
+            # If decision is identical to existing status, retain existing reviewed_at (idempotent repeat)
+            if existing["status"] == normalized_decision and reviewed_at is None:
+                effective_reviewed_at = existing["reviewed_at"] or effective_reviewed_at
+
+            # Update status and reviewed_at (preserving similarity_score, model_name, and model_version)
+            cur.execute(
+                """
+                UPDATE duplicate_links
+                SET status = %s, reviewed_at = %s
+                WHERE tenant_id = %s AND id = %s
+                RETURNING id, tenant_id, source_ticket_id, target_ticket_id,
+                          similarity_score, model_name, model_version, status,
+                          created_at, reviewed_at;
+                """,
+                (normalized_decision, effective_reviewed_at, tenant_id, existing["id"]),
+            )
+            updated_row = cur.fetchone()
+            assert updated_row is not None
+            return _row_to_duplicate_link(updated_row)
+
+        # 2. No existing link: Server-derive similarity from ticket_embeddings
+        emb_query = """
+            SELECT te1.model_name, te1.model_version,
+                   (1.0 - (te1.embedding <=> te2.embedding)) AS similarity_score
+            FROM ticket_embeddings te1
+            JOIN ticket_embeddings te2
+              ON te2.tenant_id = te1.tenant_id
+             AND te2.model_name = te1.model_name
+             AND te2.model_version = te1.model_version
+             AND te2.ticket_id = %s
+            WHERE te1.tenant_id = %s
+              AND te1.ticket_id = %s
+            ORDER BY te1.updated_at DESC, te2.updated_at DESC, te1.id DESC
+            LIMIT 1;
+        """
+        cur.execute(emb_query, (target_id, tenant_id, source_id))
+        emb_match = cur.fetchone()
+        if not emb_match:
+            raise MissingEmbeddingsError(
+                f"Cannot derive similarity: matching embeddings not found for tickets {source_id} and {target_id}."
+            )
+
+        model_name = str(emb_match["model_name"])
+        model_version = str(emb_match["model_version"])
+        similarity_score = max(-1.0, min(1.0, float(emb_match["similarity_score"])))
+
+        # 3. Insert atomically with ON CONFLICT DO UPDATE
+        insert_query = """
+            INSERT INTO duplicate_links (
+                tenant_id, source_ticket_id, target_ticket_id,
+                similarity_score, model_name, model_version,
+                status, reviewed_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (tenant_id, source_ticket_id, target_ticket_id)
+            DO UPDATE SET
+                status = EXCLUDED.status,
+                reviewed_at = EXCLUDED.reviewed_at
+            RETURNING id, tenant_id, source_ticket_id, target_ticket_id,
+                      similarity_score, model_name, model_version, status,
+                      created_at, reviewed_at;
+        """
+        cur.execute(
+            insert_query,
+            (
+                tenant_id,
+                source_id,
+                target_id,
+                similarity_score,
+                model_name,
+                model_version,
+                normalized_decision,
+                effective_reviewed_at,
+            ),
+        )
+        new_row = cur.fetchone()
+        assert new_row is not None
+        return _row_to_duplicate_link(new_row)

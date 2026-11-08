@@ -1,4 +1,4 @@
-import { User, TicketListItem, Pagination, TicketDetailResponse, SimilarTicketsResponse } from './types';
+import { User, TicketListItem, Pagination, TicketDetailResponse, SimilarTicketsResponse, SimilarFeedbackResponse } from './types';
 
 class ApiClient {
   private csrfToken: string | null = null;
@@ -107,6 +107,24 @@ class ApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, body, csrf_token: this.csrfToken }),
+      }
+    );
+  }
+
+  public async submitSimilarFeedback(
+    ticketId: string,
+    similarTicketId: string,
+    decision: 'confirmed' | 'rejected'
+  ): Promise<SimilarFeedbackResponse> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<SimilarFeedbackResponse>(
+      `/browser-api/tickets/${ticketId}/similar/${similarTicketId}/feedback`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, csrf_token: this.csrfToken }),
       }
     );
   }

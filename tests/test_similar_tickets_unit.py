@@ -151,11 +151,13 @@ def test_find_similar_tickets_successful_query_and_scoping():
     assert "AND te.ticket_id <> %s" in cand_query
     assert "ORDER BY te.embedding <=> %s::vector ASC, t.id ASC" in cand_query
 
-    assert cand_params[1] == tenant_id
-    assert cand_params[2] == "all-MiniLM-L6-v2"
-    assert cand_params[3] == "rev_test_123"
-    assert cand_params[4] == source_ticket_id
-    assert cand_params[6] == 5
+    assert cand_params[1] == source_ticket_id
+    assert cand_params[2] == source_ticket_id
+    assert cand_params[3] == tenant_id
+    assert cand_params[4] == "all-MiniLM-L6-v2"
+    assert cand_params[5] == "rev_test_123"
+    assert cand_params[6] == source_ticket_id
+    assert cand_params[8] == 5
 
 
 def test_find_similar_tickets_limit_bounding_and_score_clamping():
@@ -202,7 +204,7 @@ def test_find_similar_tickets_limit_bounding_and_score_clamping():
     )
 
     cand_params = mock_cur.execute.call_args_list[1][0][1]
-    assert cand_params[6] == 50  # Bounded to 50
+    assert cand_params[8] == 50  # Bounded to 50
     assert candidates[0].similarity_score == 1.0  # Clamped
     assert candidates[1].similarity_score == -1.0  # Clamped
 

@@ -159,6 +159,23 @@ class CreateBrowserTicketPayload(BaseModel):
         return cleaned
 
 
+class SimilarFeedbackPayload(BaseModel):
+    decision: str = Field(..., description="Operator duplicate decision: 'confirmed' or 'rejected'.")
+    csrf_token: str | None = Field(default=None, max_length=255, description="Optional CSRF token in body if not in header.")
+
+    @field_validator("decision")
+    @classmethod
+    def validate_decision(cls, v: str) -> str:
+        cleaned = v.strip().lower()
+        if cleaned not in ("confirmed", "rejected"):
+            raise ValueError("Decision must be either 'confirmed' or 'rejected'.")
+        return cleaned
+
+
+class SimilarFeedbackBodyPayload(SimilarFeedbackPayload):
+    similar_ticket_id: str = Field(..., description="Target similar ticket ID.")
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -548,6 +565,8 @@ def get_similar_tickets_json(
             "priority": c.priority,
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "similarity_score": round(c.similarity_score, 4),
+            "decision_status": c.decision_status,
+            "reviewed_at": c.reviewed_at.isoformat() if c.reviewed_at else None,
         }
         for c in candidates
     ]
@@ -561,4 +580,177 @@ def get_similar_tickets_json(
         "items": items,
         "notice": "Possible similar tickets based on uncalibrated cosine text similarity. Relevance quality is not evaluated; duplicate links are not automatically created.",
         "message": None if has_embedding else "No embedding vector has been generated for this ticket yet. Similar ticket suggestions will become available once background embedding processing completes.",
+    }
+
+
+@router.post("/tickets/{ticket_id}/similar/{similar_ticket_id}/feedback")
+async def record_similar_feedback_json(
+    ticket_id: str,
+    similar_ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Record operator confirm or reject duplicate feedback for a suggested ticket pair.
+
+    Rules:
+    - Session-bound CSRF validation.
+    - Tenant ownership validation for both tickets.
+    - Self-link rejection (returns 400).
+    - Canonical pair ordering in duplicate_links (source < target).
+    - Server-derived similarity and embedding model metadata (never trust client scores).
+    - Idempotent repeat actions without duplicate rows.
+    - Updates reviewed_at when decision changes.
+    - Human decision only: does not merge, delete, or alter tickets.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        t1_uuid = uuid.UUID(ticket_id)
+        t2_uuid = uuid.UUID(similar_ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    if t1_uuid == t2_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "self_link", "message": "Cannot link a ticket to itself."},
+        )
+
+    raw_data = await read_bounded_json_body(request)
+    try:
+        payload = SimilarFeedbackPayload.model_validate(raw_data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+    validate_browser_csrf(request, "triage_session", payload.csrf_token)
+
+    with get_connection() as conn:
+        # Validate tenant ownership for both tickets
+        t1 = get_ticket_by_id(conn, principal.tenant_id, t1_uuid)
+        t2 = get_ticket_by_id(conn, principal.tenant_id, t2_uuid)
+        if not t1 or not t2:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        try:
+            with conn.transaction():
+                link = dup_repo.record_duplicate_feedback(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    ticket_id_1=t1_uuid,
+                    ticket_id_2=t2_uuid,
+                    decision=payload.decision,
+                )
+        except dup_repo.MissingEmbeddingsError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "missing_embeddings", "message": str(err)},
+            )
+        except dup_repo.SelfLinkError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "self_link", "message": str(err)},
+            )
+        except dup_repo.InvalidStatusError as err:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "invalid_input", "message": str(err)},
+            )
+
+    return {
+        "link_id": str(link.id),
+        "source_ticket_id": str(link.source_ticket_id),
+        "target_ticket_id": str(link.target_ticket_id),
+        "similarity_score": round(link.similarity_score, 4),
+        "model_name": link.model_name,
+        "model_version": link.model_version,
+        "decision": link.status,
+        "reviewed_at": link.reviewed_at.isoformat() if link.reviewed_at else None,
+        "notice": "Human duplicate decision recorded. This does not alter ticket contents or automatically retrain models.",
+    }
+
+
+@router.post("/tickets/{ticket_id}/similar-feedback")
+async def record_similar_feedback_body_json(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Alternative endpoint accepting similar_ticket_id in JSON payload."""
+    response.headers["Cache-Control"] = "no-store"
+
+    raw_data = await read_bounded_json_body(request)
+    try:
+        payload = SimilarFeedbackBodyPayload.model_validate(raw_data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+    try:
+        t1_uuid = uuid.UUID(ticket_id)
+        t2_uuid = uuid.UUID(payload.similar_ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    if t1_uuid == t2_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "self_link", "message": "Cannot link a ticket to itself."},
+        )
+
+    validate_browser_csrf(request, "triage_session", payload.csrf_token)
+
+    with get_connection() as conn:
+        t1 = get_ticket_by_id(conn, principal.tenant_id, t1_uuid)
+        t2 = get_ticket_by_id(conn, principal.tenant_id, t2_uuid)
+        if not t1 or not t2:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        try:
+            with conn.transaction():
+                link = dup_repo.record_duplicate_feedback(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    ticket_id_1=t1_uuid,
+                    ticket_id_2=t2_uuid,
+                    decision=payload.decision,
+                )
+        except dup_repo.MissingEmbeddingsError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "missing_embeddings", "message": str(err)},
+            )
+        except dup_repo.SelfLinkError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "self_link", "message": str(err)},
+            )
+        except dup_repo.InvalidStatusError as err:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "invalid_input", "message": str(err)},
+            )
+
+    return {
+        "link_id": str(link.id),
+        "source_ticket_id": str(link.source_ticket_id),
+        "target_ticket_id": str(link.target_ticket_id),
+        "similarity_score": round(link.similarity_score, 4),
+        "model_name": link.model_name,
+        "model_version": link.model_version,
+        "decision": link.status,
+        "reviewed_at": link.reviewed_at.isoformat() if link.reviewed_at else None,
+        "notice": "Human duplicate decision recorded. This does not alter ticket contents or automatically retrain models.",
     }
