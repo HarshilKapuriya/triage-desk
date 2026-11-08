@@ -1,0 +1,285 @@
+{
+  "metadata": {
+    "run_id": "run_006_sla_risk_feasibility",
+    "created_at": "2026-11-08T15:04:26.670843+00:00",
+    "target_definition": "resolution_hours * 60.0 > 1440.0 (strict inequality, 24 calendar hours)",
+    "feature_allowlist": [
+      "message",
+      "product",
+      "channel"
+    ],
+    "excluded_outcome_columns": [
+      "resolution_hours",
+      "first_response_hours",
+      "status",
+      "csat_score"
+    ],
+    "excluded_triage_and_meta_columns": [
+      "ticket_id",
+      "created_at",
+      "category",
+      "priority",
+      "sentiment"
+    ],
+    "random_seed": 42,
+    "dataset_sha256": "c93d5d57e69bee8ac8cb8447af3469fc150c5414761f7197fd1775c6de2a5f2e",
+    "total_rows": 20000,
+    "overall_prevalence": 0.15335,
+    "validation_tuned_threshold": 0.19,
+    "model_sha256": "4d20957606f09b99039ce9e547efe4badf45bfad025baf617d0f384d654ca93a"
+  },
+  "splits": {
+    "train": {
+      "row_count": 14079,
+      "positive_count": 2126,
+      "negative_count": 11953,
+      "prevalence": 0.15100504297180198,
+      "unique_messages": 4272
+    },
+    "validation": {
+      "row_count": 2960,
+      "positive_count": 479,
+      "negative_count": 2481,
+      "prevalence": 0.16182432432432434,
+      "unique_messages": 916
+    },
+    "test": {
+      "row_count": 2961,
+      "positive_count": 462,
+      "negative_count": 2499,
+      "prevalence": 0.15602836879432624,
+      "unique_messages": 916
+    },
+    "group_overlap_checks": {
+      "train_val_message_overlap": 0,
+      "train_test_message_overlap": 0,
+      "val_test_message_overlap": 0
+    }
+  },
+  "evaluations": {
+    "dummy_prior": {
+      "validation": {
+        "average_precision": 0.16182432432432434,
+        "roc_auc": 0.5,
+        "brier_score": 0.13575426923028527,
+        "log_loss": 0.4431305684681768,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2481,
+              0
+            ],
+            [
+              479,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2481,
+          "fp": 0,
+          "fn": 479,
+          "tp": 0
+        }
+      },
+      "test": {
+        "average_precision": 0.15602836879432624,
+        "roc_auc": 0.5,
+        "brier_score": 0.1317087507280272,
+        "log_loss": 0.43312246014109906,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2499,
+              0
+            ],
+            [
+              462,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2499,
+          "fp": 0,
+          "fn": 462,
+          "tp": 0
+        }
+      }
+    },
+    "metadata_only_logistic_regression": {
+      "validation": {
+        "average_precision": 0.1656069023766354,
+        "roc_auc": 0.5091896745116749,
+        "brier_score": 0.13581839985391317,
+        "log_loss": 0.4434255489644793,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2481,
+              0
+            ],
+            [
+              479,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2481,
+          "fp": 0,
+          "fn": 479,
+          "tp": 0
+        }
+      },
+      "test": {
+        "average_precision": 0.15174271556486452,
+        "roc_auc": 0.48583329435670375,
+        "brier_score": 0.13197600745917723,
+        "log_loss": 0.4341831419893005,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2499,
+              0
+            ],
+            [
+              462,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2499,
+          "fp": 0,
+          "fn": 462,
+          "tp": 0
+        }
+      }
+    },
+    "text_metadata_logistic_regression_default_threshold_0_50": {
+      "validation": {
+        "average_precision": 0.279867012144032,
+        "roc_auc": 0.6808584490562514,
+        "brier_score": 0.127664404644897,
+        "log_loss": 0.4150425912395804,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2481,
+              0
+            ],
+            [
+              479,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2481,
+          "fp": 0,
+          "fn": 479,
+          "tp": 0
+        }
+      },
+      "test": {
+        "average_precision": 0.23827870699751616,
+        "roc_auc": 0.6334412552899948,
+        "brier_score": 0.1281849716263304,
+        "log_loss": 0.4217966086528835,
+        "decision_threshold": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              2498,
+              1
+            ],
+            [
+              462,
+              0
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 2498,
+          "fp": 1,
+          "fn": 462,
+          "tp": 0
+        }
+      }
+    },
+    "text_metadata_logistic_regression_val_tuned_threshold": {
+      "validation": {
+        "average_precision": 0.279867012144032,
+        "roc_auc": 0.6808584490562514,
+        "brier_score": 0.127664404644897,
+        "log_loss": 0.4150425912395804,
+        "decision_threshold": 0.19,
+        "precision": 0.3025871766029246,
+        "recall": 0.5615866388308977,
+        "f1": 0.3932748538011696,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              1861,
+              620
+            ],
+            [
+              210,
+              269
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 1861,
+          "fp": 620,
+          "fn": 210,
+          "tp": 269
+        }
+      },
+      "test": {
+        "average_precision": 0.23827870699751616,
+        "roc_auc": 0.6334412552899948,
+        "brier_score": 0.1281849716263304,
+        "log_loss": 0.4217966086528835,
+        "decision_threshold": 0.19,
+        "precision": 0.2552910052910053,
+        "recall": 0.41774891774891776,
+        "f1": 0.3169129720853859,
+        "confusion_matrix": {
+          "matrix": [
+            [
+              1936,
+              563
+            ],
+            [
+              269,
+              193
+            ]
+          ],
+          "format": "[[TN, FP], [FN, TP]]",
+          "tn": 1936,
+          "fp": 563,
+          "fn": 269,
+          "tp": 193
+        }
+      }
+    }
+  }
+}

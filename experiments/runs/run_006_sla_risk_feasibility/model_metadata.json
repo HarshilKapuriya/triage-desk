@@ -1,0 +1,20 @@
+{
+  "run_id": "run_006_sla_risk_feasibility",
+  "model_type": "Pipeline(ColumnTransformer([TfidfVectorizer, OneHotEncoder]), LogisticRegression)",
+  "dataset_sha256": "c93d5d57e69bee8ac8cb8447af3469fc150c5414761f7197fd1775c6de2a5f2e",
+  "model_sha256": "4d20957606f09b99039ce9e547efe4badf45bfad025baf617d0f384d654ca93a",
+  "python_version": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
+  "dependencies": {
+    "scikit-learn": "1.9.1",
+    "joblib": "1.6.0",
+    "numpy": "2.5.4"
+  },
+  "target": "resolution_hours * 60.0 > 1440.0",
+  "features": [
+    "message",
+    "product",
+    "channel"
+  ],
+  "val_tuned_threshold": 0.19,
+  "elapsed_seconds": 1.04
+}
