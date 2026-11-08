@@ -78,6 +78,13 @@ class Settings(BaseSettings):
         description="Maximum seconds to wait for initial DB connectivity check.",
     )
 
+    # Phase 4 Ticket Embedding Generation settings (defaults to False)
+    enable_embeddings: bool = Field(
+        default=False,
+        alias="ENABLE_EMBEDDINGS",
+        description="Whether background workers generate and persist ticket embeddings for duplicate detection.",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -90,4 +97,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Retrieve cached application settings instance."""
     return Settings()
-

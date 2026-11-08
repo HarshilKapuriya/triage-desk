@@ -12,6 +12,7 @@ from typing import Any
 import uuid
 import psycopg
 from psycopg.rows import dict_row
+import app.repositories.duplicates as duplicates_repo
 import app.repositories.ml as ml_repo
 
 
@@ -104,6 +105,41 @@ def enqueue_job(
         return _row_to_job_record(row)
 
 
+def enqueue_embedding_job_if_not_exists(
+    conn: psycopg.Connection,
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    payload: dict[str, Any] | None = None,
+) -> JobRecord | None:
+    """Atomically enqueue a ticket_embedding job if one does not already exist for this ticket.
+
+    Guarantees idempotency via ON CONFLICT (tenant_id, ticket_id, type) DO NOTHING.
+    Operates strictly within the caller's transaction.
+    """
+    payload_json = json.dumps(payload or {})
+    query = """
+        INSERT INTO jobs (
+            tenant_id,
+            ticket_id,
+            type,
+            status,
+            payload
+        )
+        VALUES (%s, %s, 'ticket_embedding', 'queued', %s::jsonb)
+        ON CONFLICT (tenant_id, ticket_id, type) DO NOTHING
+        RETURNING
+            id, tenant_id, ticket_id, type, status,
+            attempts, max_attempts, run_after, locked_at, locked_by,
+            created_at, updated_at, completed_at, failed_at, error, payload;
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query, (tenant_id, ticket_id, payload_json))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return _row_to_job_record(row)
+
+
 def get_job_by_ticket_id(
     conn: psycopg.Connection,
     tenant_id: uuid.UUID,
@@ -164,6 +200,7 @@ def claim_next_job(
     worker_id: str,
     lease_seconds: int = 300,
     tenant_id: uuid.UUID | None = None,
+    allowed_types: tuple[str, ...] | list[str] = ("ticket_ingest", "ticket_embedding"),
 ) -> JobRecord | None:
     """Claim the next eligible queued job atomically.
 
@@ -172,6 +209,7 @@ def claim_next_job(
     Uses SELECT ... FOR UPDATE SKIP LOCKED and increments attempts generation on claim.
     Deterministic ordering: run_after ASC, created_at ASC, id ASC.
     """
+    types_list = list(allowed_types)
     query = """
         WITH next_job AS (
             SELECT id
@@ -180,6 +218,7 @@ def claim_next_job(
               AND run_after <= NOW()
               AND attempts < max_attempts
               AND (%s::uuid IS NULL OR tenant_id = %s)
+              AND type = ANY(%s)
             ORDER BY run_after ASC, created_at ASC, id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -198,7 +237,7 @@ def claim_next_job(
             j.created_at, j.updated_at, j.completed_at, j.failed_at, j.error, j.payload;
     """
     with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(query, (tenant_id, tenant_id, worker_id))
+        cur.execute(query, (tenant_id, tenant_id, types_list, worker_id))
         row = cur.fetchone()
         if not row:
             return None
@@ -322,6 +361,80 @@ def complete_job_with_ticket_transition(
     return True
 
 
+def complete_embedding_job(
+    conn: psycopg.Connection,
+    tenant_id: uuid.UUID,
+    job_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    worker_id: str,
+    generation: int,
+    embedding: list[float],
+    model_name: str,
+    model_version: str,
+    lease_seconds: int = 300,
+) -> bool:
+    """Atomically validate claim, persist ticket embedding, and complete job.
+
+    All mutations occur inside the caller's transaction without internal commits.
+    If claim ownership or lease validity is lost, raises StaleClaimError ensuring zero side-effects commit.
+    """
+    # 1. Validate and complete the job claim atomically
+    complete_query = """
+        UPDATE jobs
+        SET status = 'completed',
+            completed_at = NOW(),
+            locked_at = NULL,
+            locked_by = NULL,
+            updated_at = NOW()
+        WHERE id = %s
+          AND tenant_id = %s
+          AND status = 'running'
+          AND locked_by = %s
+          AND attempts = %s
+          AND locked_at >= NOW() - (%s || ' seconds')::interval;
+    """
+    with conn.cursor() as cur:
+        cur.execute(complete_query, (job_id, tenant_id, worker_id, generation, lease_seconds))
+        if cur.rowcount == 0:
+            raise StaleClaimError("Cannot complete embedding job: active lease expired or generation mismatch.")
+
+    # 2. Persist embedding atomically via duplicates repository (idempotent under retries)
+    duplicates_repo.save_ticket_embedding(
+        conn=conn,
+        tenant_id=tenant_id,
+        ticket_id=ticket_id,
+        embedding=embedding,
+        model_name=model_name,
+        model_version=model_version,
+    )
+    return True
+
+
+def release_claimed_job_to_queued(
+    conn: psycopg.Connection,
+    tenant_id: uuid.UUID,
+    job_id: uuid.UUID,
+    worker_id: str,
+    generation: int,
+) -> bool:
+    """Release a claimed job back to queued status without incrementing attempts."""
+    query = """
+        UPDATE jobs
+        SET status = 'queued',
+            locked_at = NULL,
+            locked_by = NULL,
+            updated_at = NOW()
+        WHERE id = %s
+          AND tenant_id = %s
+          AND status = 'running'
+          AND locked_by = %s
+          AND attempts = %s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query, (job_id, tenant_id, worker_id, generation))
+        return cur.rowcount > 0
+
+
 def fail_or_retry_job(
     conn: psycopg.Connection,
     tenant_id: uuid.UUID,
@@ -432,5 +545,3 @@ def recover_stale_jobs(
     with conn.cursor() as cur:
         cur.execute(query, (lease_seconds, tenant_id, tenant_id))
         return cur.rowcount
-
-

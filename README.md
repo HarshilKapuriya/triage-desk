@@ -44,13 +44,14 @@ Required environment variables in `.env`:
 - `JWT_EXPIRE_MINUTES`: JWT token validity lifetime (default: 60).
 - `DB_CONNECT_ON_STARTUP`: Set to `true` (default) to test database reachability upon startup.
 - `DB_STARTUP_TIMEOUT_SECONDS`: Maximum seconds to wait for initial DB connectivity (default: 5.0).
+- `ENABLE_EMBEDDINGS`: Set to `true` to enable asynchronous ticket embedding generation and worker processing (default: `false`).
 
 > **Important**: Never commit `.env` or print secret connection strings to logs or chat.
 
 ### 4. Database Migrations
 
 #### Standard Migration Procedure (Fresh Databases & CI)
-The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`, `004_embeddings_duplicates.sql`), managed by `scripts/migrate.py`.
+The repository uses sequential numbered SQL migrations under `migrations/` (`001_init.sql`, `002_jobs.sql`, `003_ml_predictions.sql`, `004_embeddings_duplicates.sql`, `005_ticket_embedding_jobs.sql`), managed by `scripts/migrate.py`.
 
 To apply all pending migrations on a new database:
 ```powershell
@@ -82,8 +83,9 @@ cd triage-desk
 .\.venv\Scripts\python.exe -m app.worker.main
 ```
 - Standalone queue worker polling `jobs` using `SELECT ... FOR UPDATE SKIP LOCKED` (default 1.0s interval).
-- Loads and verifies trusted LinearSVC model (`run_004`) once on process startup.
+- Loads and verifies trusted LinearSVC model (`run_004`) once on process startup. When `ENABLE_EMBEDDINGS=true`, also preloads trusted embedding model adapter (`all-MiniLM-L6-v2`).
 - Claims queued tickets, executes narrative inference, registers model version, stores prediction in `ticket_predictions`, and transitions ticket from `new` to `open`.
+- If `ENABLE_EMBEDDINGS=true`, ingest success atomically enqueues a `ticket_embedding` job; the worker claims `ticket_embedding` jobs, computes embeddings outside transactions, and completes them atomically. If `ENABLE_EMBEDDINGS=false`, embedding jobs are excluded from worker claims and remain pending without blocking ingestion.
 - Graceful shutdown on `Ctrl+C` (SIGINT) or SIGTERM. Optional flags: `--poll-interval <sec>`, `--lease-seconds <sec>`.
 
 #### Terminal 3: React Frontend (Vite Development Server)
@@ -319,6 +321,12 @@ python -m pytest tests/test_health.py -v
 # Run embedding adapter and provisioning unit tests (offline, fake tokenizer/session)
 python -m pytest tests/test_embedding_adapter.py -v
 
+# Run independent ticket_embedding job unit tests (offline, fakes/mocks)
+python -m pytest tests/test_embedding_jobs_unit.py -v
+
+# Run embedding database integration tests (strictly requires local disposable PostgreSQL; skips on hosted DBs)
+python -m pytest tests/test_embedding_jobs_db.py -v
+
 # Run database integration tests (requires configured TEST_DATABASE_URL)
 python -m pytest tests/test_auth_db.py tests/test_api_keys_db.py tests/test_tickets_db.py tests/test_jobs_db.py tests/test_worker_db.py tests/test_duplicates_db.py -v
 
@@ -349,6 +357,9 @@ python -m pytest tests/test_isolation.py -v
   - *Offline Test Coverage*: Verified text normalization, CRLF/CR newline normalization to LF, 4,000-character resource-bounding cap, 256-token subword truncation configuration, attention-mask-weighted mean pooling against mathematical test fixtures (zero weight on masked tokens), L2 vector unit normalization within tolerance, rejection of invalid inputs (empty masks, zero norms, NaN/infinities, non-3D tensors, wrong hidden dimensions), graph input/output type and 3D dimension inspection at load, manifest SHA-256 validation, full 40-character model revision in pipeline identity, and per-file atomic CLI downloader behavior (temporary-file streaming, size/digest verification, abort on oversized/truncated payloads, cleanup of temp files, and non-replacement of valid files).
   - *Opt-In Real-Model Smoke Test*: 1 skipped (`test_real_embedding_model_smoke`), gated by `RUN_REAL_EMBEDDING_TESTS=true`. Contract verified separately: fails with clear message directing operator to provision weights if enabled without model artifacts, and skips cleanly when disabled.
   - *Retained Execution Boundaries*: Real-model inference was not executed; artifact provisioning was not executed; worker integration was not implemented; duplicate-detection quality was not evaluated; and remote CI was last observed billing-blocked before execution.
+- **Phase 4 Slice 3 Independent Embedding Jobs (`pytest tests/test_embedding_jobs_unit.py -v`)**: 13 passed, 0 failed.
+  - *Offline Test Coverage*: Verified atomic enqueue of `ticket_embedding` job on `ticket_ingest` completion only when `ENABLE_EMBEDDINGS=true`; zero enqueue when disabled; worker claim exclusion of embedding jobs when disabled (`allowed_types=("ticket_ingest",)`); safe release to `queued` if an embedding job is claimed while disabled; CPU tensor inference execution outside DB transactions; atomic completion and embedding persistence in caller transaction; isolation of embedding failure from category predictions; lease renewal and stale claim fencing (`StaleClaimError` on expired lease or worker mismatch); and idempotent enqueueing (`ON CONFLICT DO NOTHING`).
+  - *Database Integration Safety*: `tests/test_embedding_jobs_db.py` contains a strict guard requiring a local disposable PostgreSQL instance (localhost/127.0.0.1); 2 tests cleanly skipped when running in environments without a local throwaway database, preventing any connections to hosted Supabase.
 
 ### 2. Manual Browser Testing Record (2026-11-06)
 - **Ticket Submission Smoke Test (Conducted by User)**:
@@ -364,4 +375,3 @@ python -m pytest tests/test_isolation.py -v
     2. The detail-page "Processing Status" card displays correctly with queue status details.
     3. The manual "↻ Refresh" button works properly and the saved prediction remains visible.
     - *Scope Note: Failed and retry states were verified via automated integration assertions; the user did not manually test failed or retry states.*
-

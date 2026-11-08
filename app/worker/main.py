@@ -14,6 +14,7 @@ import signal
 import sys
 import threading
 import time
+from typing import Any
 import uuid
 import psycopg
 from dotenv import load_dotenv
@@ -39,6 +40,8 @@ class WorkerService:
         poll_interval: float = 1.0,
         lease_seconds: int = 300,
         recovery_interval: float = 60.0,
+        enable_embeddings: bool | None = None,
+        embedding_adapter: Any | None = None,
     ) -> None:
         self.db_url = db_url
         self.worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
@@ -47,6 +50,12 @@ class WorkerService:
         self.recovery_interval = recovery_interval
         self._stop_event = threading.Event()
         self._last_recovery_time = 0.0
+
+        cfg = get_settings()
+        self.enable_embeddings = (
+            enable_embeddings if enable_embeddings is not None else cfg.enable_embeddings
+        )
+        self.embedding_adapter = embedding_adapter
 
     def stop(self) -> None:
         """Signal the worker to stop gracefully."""
@@ -79,6 +88,12 @@ class WorkerService:
                 logger.error(f"Worker {self.worker_id}: error during stale job recovery: {e}")
             self._last_recovery_time = now
 
+        allowed_types: tuple[str, ...] = (
+            ("ticket_ingest", "ticket_embedding")
+            if self.enable_embeddings
+            else ("ticket_ingest",)
+        )
+
         # Claim next eligible queued job
         job: job_repo.JobRecord | None = None
         try:
@@ -88,6 +103,7 @@ class WorkerService:
                     worker_id=self.worker_id,
                     lease_seconds=self.lease_seconds,
                     tenant_id=tenant_id,
+                    allowed_types=allowed_types,
                 )
         except Exception as e:
             logger.error(f"Worker {self.worker_id}: error claiming job: {e}")
@@ -102,6 +118,8 @@ class WorkerService:
             job=job,
             worker_id=self.worker_id,
             lease_seconds=self.lease_seconds,
+            enable_embeddings=self.enable_embeddings,
+            embedding_adapter=self.embedding_adapter,
         )
         logger.info(f"Worker {self.worker_id}: job {job.id} finished with status '{result}'")
         return result
@@ -117,6 +135,17 @@ class WorkerService:
             logger.info("Trusted ML model loaded and verified once on worker process startup.")
         except Exception as exc:
             logger.warning(f"Could not preload model artifact on worker start (will retry on job): {exc}")
+
+        # Preload embedding adapter once per worker process if enabled
+        if self.enable_embeddings and self.embedding_adapter is None:
+            try:
+                from app.ml.embeddings import EmbeddingModelAdapter
+                adapter = EmbeddingModelAdapter()
+                adapter.load()
+                self.embedding_adapter = adapter
+                logger.info("Trusted embedding model adapter loaded and verified once on worker process startup.")
+            except Exception as exc:
+                logger.warning(f"Could not preload embedding model on worker start (will retry on job): {exc}")
 
         with psycopg.connect(self.db_url, autocommit=True) as conn:
             while not self._stop_event.is_set():

@@ -9,6 +9,7 @@ Per SPEC.md & architecture decisions:
 """
 
 import logging
+from typing import Any
 import uuid
 import psycopg
 
@@ -31,13 +32,33 @@ def process_claimed_job(
     worker_id: str,
     lease_seconds: int = 300,
     enable_inference: bool = True,
+    enable_embeddings: bool = False,
+    embedding_adapter: Any | None = None,
 ) -> str:
-    """Process a single claimed job.
+    """Process a single claimed job based on its type.
 
     Returns:
         str: 'completed', 'requeued', 'failed', 'stale_claim', or 'unsupported_job_type'.
     """
-    if job.type != "ticket_ingest":
+    if job.type == "ticket_ingest":
+        return _process_ticket_ingest_job(
+            conn=conn,
+            job=job,
+            worker_id=worker_id,
+            lease_seconds=lease_seconds,
+            enable_inference=enable_inference,
+            enable_embeddings=enable_embeddings,
+        )
+    elif job.type == "ticket_embedding":
+        return _process_ticket_embedding_job(
+            conn=conn,
+            job=job,
+            worker_id=worker_id,
+            lease_seconds=lease_seconds,
+            enable_embeddings=enable_embeddings,
+            embedding_adapter=embedding_adapter,
+        )
+    else:
         logger.warning(f"Worker {worker_id}: unsupported job type '{job.type}' for job {job.id}")
         try:
             with conn.transaction():
@@ -53,6 +74,16 @@ def process_claimed_job(
             logger.error(f"Error recording failure for unsupported job {job.id}: {exc}")
         return "unsupported_job_type"
 
+
+def _process_ticket_ingest_job(
+    conn: psycopg.Connection,
+    job: job_repo.JobRecord,
+    worker_id: str,
+    lease_seconds: int = 300,
+    enable_inference: bool = True,
+    enable_embeddings: bool = False,
+) -> str:
+    """Process ticket_ingest: classify complaint category, transition status, and conditionally enqueue embedding."""
     try:
         model_version_id = None
         predicted_label = None
@@ -67,7 +98,6 @@ def process_claimed_job(
                 raise RuntimeError(f"Referenced ticket {job.ticket_id} not found for tenant {job.tenant_id}.")
 
             # 2. Run classification using ticket body as input
-            # If missing/corrupt artifact, this raises an explicit operational error caught below
             model_mgr = get_model_manager()
             inference_res = model_mgr.predict_ticket(ticket.body)
 
@@ -112,6 +142,13 @@ def process_claimed_job(
                 decision_scores=decision_scores,
                 metadata=meta,
             )
+            # Atomically enqueue embedding job only when feature is enabled
+            if enable_embeddings:
+                job_repo.enqueue_embedding_job_if_not_exists(
+                    conn=conn,
+                    tenant_id=job.tenant_id,
+                    ticket_id=job.ticket_id,
+                )
         return "completed"
 
     except job_repo.StaleClaimError:
@@ -136,4 +173,87 @@ def process_claimed_job(
             return status
         except Exception as fail_exc:
             logger.error(f"Worker {worker_id}: failed to record retry/failure for job {job.id}: {fail_exc}")
+            return "error_recording_failure"
+
+
+def _process_ticket_embedding_job(
+    conn: psycopg.Connection,
+    job: job_repo.JobRecord,
+    worker_id: str,
+    lease_seconds: int = 300,
+    enable_embeddings: bool = False,
+    embedding_adapter: Any | None = None,
+) -> str:
+    """Process ticket_embedding: generate 384-dim dense vector and persist into ticket_embeddings."""
+    if not enable_embeddings:
+        # Do not mark existing embedding jobs completed without producing an embedding
+        # merely because the feature is disabled. Leave them pending and release claim.
+        logger.info(
+            f"Worker {worker_id}: embedding feature disabled; releasing job {job.id} back to queued."
+        )
+        with conn.transaction():
+            job_repo.release_claimed_job_to_queued(
+                conn=conn,
+                tenant_id=job.tenant_id,
+                job_id=job.id,
+                worker_id=worker_id,
+                generation=job.attempts,
+            )
+        return "requeued"
+
+    try:
+        # 1. Fetch ticket strictly by tenant_id to retrieve ticket subject and body
+        ticket = ticket_repo.get_ticket_by_id(conn, tenant_id=job.tenant_id, ticket_id=job.ticket_id)
+        if not ticket:
+            raise RuntimeError(f"Referenced ticket {job.ticket_id} not found for tenant {job.tenant_id}.")
+
+        # 2. Resolve embedding adapter (or load lazily)
+        adapter = embedding_adapter
+        if adapter is None:
+            from app.ml.embeddings import EmbeddingModelAdapter
+            adapter = EmbeddingModelAdapter()
+
+        # 3. CPU tensor inference executed OUTSIDE database transactions
+        embedding_res = adapter.embed_ticket(subject=ticket.subject, body=ticket.body)
+
+        # 4. Atomic completion and embedding persistence inside a short transaction
+        with conn.transaction():
+            job_repo.complete_embedding_job(
+                conn=conn,
+                tenant_id=job.tenant_id,
+                job_id=job.id,
+                ticket_id=job.ticket_id,
+                worker_id=worker_id,
+                generation=job.attempts,
+                embedding=embedding_res.vector,
+                model_name=embedding_res.model_name,
+                model_version=embedding_res.model_revision,
+                lease_seconds=lease_seconds,
+            )
+        return "completed"
+
+    except job_repo.StaleClaimError:
+        logger.warning(
+            f"Worker {worker_id}: lost claim or lease expired for embedding job {job.id} (gen {job.attempts})"
+        )
+        return "stale_claim"
+
+    except Exception as exc:
+        err_msg = f"{exc.__class__.__name__}: {str(exc)}"
+        logger.error(f"Worker {worker_id}: embedding processing failed for job {job.id}: {err_msg}")
+        try:
+            with conn.transaction():
+                status = job_repo.fail_or_retry_job(
+                    conn=conn,
+                    tenant_id=job.tenant_id,
+                    job_id=job.id,
+                    worker_id=worker_id,
+                    generation=job.attempts,
+                    error_message=err_msg,
+                )
+            return status
+        except Exception as fail_exc:
+            logger.error(
+                f"Worker {worker_id}: failed to record retry/failure for embedding job {job.id}: {fail_exc}"
+            )
             return "error_recording_failure"
