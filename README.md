@@ -336,6 +336,12 @@ python -m pytest tests/test_retrieval_benchmark_unit.py -v
 # Run Phase 4 Knowledge-Base offline retrieval quality evaluation benchmark
 python scripts/evaluate_retrieval.py
 
+# Run Phase 5 SLA evaluation unit tests and repository unit tests (offline, fakes/mocks)
+python -m pytest tests/test_sla_unit.py tests/test_sla_repo_unit.py -v
+
+# Run Phase 5 SLA database integration tests (guarded; requires local disposable PostgreSQL)
+python -m pytest tests/test_sla_db.py -v
+
 # Run embedding database integration tests (strictly requires local disposable PostgreSQL; skips on hosted DBs)
 python -m pytest tests/test_embedding_jobs_db.py tests/test_similar_tickets_db.py -v
 
@@ -382,6 +388,11 @@ python -m pytest tests/test_isolation.py -v
   - *Benchmark Execution*: Offline evaluation over frozen synthetic corpus (10 articles, 12 deterministic chunks, SHA-256: `18ae28b9f7a7ce7cb86eb9485ececf69e8fcc1c89491086ea107b3dfbe9cf59e`) and 30 labeled support queries (SHA-256: `314ebfdd88c667a2c1be50df109fe663127b56b8c14f1c854157f071eb524e8a`).
   - *Macro Baseline Metrics*: Macro Recall@1 = 91.7%, Recall@3 = 100.0%, Recall@5 = 100.0%, Hit Rate@1 = 93.3%, Hit Rate@3 = 100.0%, Hit Rate@5 = 100.0%, MRR = 0.9611.
   - *Full Evaluation Report*: Detailed analysis of sub-ranked queries, separated execution timings, and scope limitations documented in `RETRIEVAL_EVALUATION.md`. Run artifacts immutably archived under `experiments/runs/run_005_retrieval_benchmark/`.
+- **Phase 5 Slice 1 Deterministic SLA Foundations (`pytest tests/test_sla_unit.py tests/test_sla_repo_unit.py -v`)**: 13 passed, 0 failed.
+  - *Offline Test Coverage*: Verified pure SLA target evaluation with injected clock (never hides clock); exact deadline math (`created_at + duration_minutes`); boundary semantics (at deadline incomplete target is active, not overdue); permanent breach on late completion; independent response and resolution state tracking; rules-based urgency bands (`low`, `medium`, `high`, `overdue`); rejection of naive timestamps and impossible ordering; and repository primitives (`record_first_response`, `resolve_ticket`, `close_ticket`) verifying tenant scoping, idempotency, and invalid transition rejection.
+  - *Explicit Phase 5 Limitations*: Supervised internal operational labels and trained predictive modeling remain unfinished Phase 5 work; rules-based urgency bands are descriptive operational indicators, not statistical breach probabilities.
+  - *Database Integration Safety*: `tests/test_sla_db.py` contains a strict guard requiring a local disposable PostgreSQL instance (2 tests cleanly skipped in environments without local Postgres, avoiding hosted Supabase).
+
 
 
 

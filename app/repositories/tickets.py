@@ -34,6 +34,11 @@ class TicketRecord:
     assignee_id: uuid.UUID | None
 
 
+class InvalidStatusTransitionError(ValueError):
+    """Raised when an invalid ticket lifecycle transition is attempted."""
+    pass
+
+
 @dataclass(frozen=True)
 class TicketListItem:
     """Read-only view of a ticket list row with prediction and job processing metadata."""
@@ -248,4 +253,179 @@ def list_tickets_with_prediction(
             )
             for r in rows
         ]
+
+
+def record_first_response(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    responded_at: datetime,
+) -> TicketRecord | None:
+    """Record first_response_at on a ticket, strictly scoped to tenant_id.
+
+    Guarantees:
+    - Independent of ticket status (does not alter status).
+    - Preserves existing first_response_at on repeated calls (idempotent).
+    - Rejects naive timestamps without timezone awareness.
+    - Caller owns the transaction; does not call commit().
+    - Returns updated TicketRecord or None if ticket not found.
+    """
+    if responded_at.tzinfo is None or responded_at.tzinfo.utcoffset(responded_at) is None:
+        raise ValueError(f"responded_at must be timezone-aware (received naive datetime: {responded_at})")
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT id, tenant_id, created_at, first_response_at
+            FROM tickets
+            WHERE tenant_id = %s AND id = %s
+            FOR UPDATE;
+            """,
+            (tenant_id, ticket_id),
+        )
+        current = cur.fetchone()
+        if not current:
+            return None
+
+        created_at = current.get("created_at")
+        if created_at is not None and responded_at < created_at:
+            raise ValueError(
+                f"responded_at ({responded_at}) cannot precede ticket created_at ({created_at})."
+            )
+
+        cur.execute(
+            """
+            UPDATE tickets
+            SET first_response_at = COALESCE(first_response_at, %s)
+            WHERE tenant_id = %s AND id = %s
+            RETURNING id, tenant_id, external_id, subject, body, customer_email,
+                      status, category, priority, created_at,
+                      first_response_at, resolved_at, assignee_id;
+            """,
+            (responded_at, tenant_id, ticket_id),
+        )
+        row = cur.fetchone()
+        return _row_to_ticket(row) if row else None
+
+
+def resolve_ticket(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    resolved_at: datetime,
+) -> TicketRecord | None:
+    """Transition ticket to 'resolved' and record resolved_at timestamp.
+
+    Guarantees:
+    - Strictly scoped to tenant_id.
+    - Preserves existing resolved_at timestamp on repeated calls if already resolved.
+    - Raises InvalidStatusTransitionError if ticket is already 'closed' (no reopening).
+    - Rejects naive timestamps without timezone awareness.
+    - Rejects resolved_at preceding ticket created_at.
+    - Does not alter or infer first_response_at.
+    - Caller owns the transaction; does not call commit().
+    - Returns updated TicketRecord or None if ticket not found.
+    """
+    if resolved_at.tzinfo is None or resolved_at.tzinfo.utcoffset(resolved_at) is None:
+        raise ValueError(f"resolved_at must be timezone-aware (received naive datetime: {resolved_at})")
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        # Atomic lock on ticket row to verify current state
+        cur.execute(
+            """
+            SELECT id, tenant_id, external_id, subject, body, customer_email,
+                   status, category, priority, created_at,
+                   first_response_at, resolved_at, assignee_id
+            FROM tickets
+            WHERE tenant_id = %s AND id = %s
+            FOR UPDATE;
+            """,
+            (tenant_id, ticket_id),
+        )
+        current = cur.fetchone()
+        if not current:
+            return None
+
+        current_status = current["status"]
+        if current_status == "closed":
+            raise InvalidStatusTransitionError(
+                f"Cannot resolve ticket {ticket_id}: ticket is already closed."
+            )
+
+        created_at = current.get("created_at")
+        if created_at is not None and resolved_at < created_at:
+            raise ValueError(
+                f"resolved_at ({resolved_at}) cannot precede ticket created_at ({created_at})."
+            )
+
+        cur.execute(
+            """
+            UPDATE tickets
+            SET status = 'resolved',
+                resolved_at = COALESCE(resolved_at, %s)
+            WHERE tenant_id = %s AND id = %s
+            RETURNING id, tenant_id, external_id, subject, body, customer_email,
+                      status, category, priority, created_at,
+                      first_response_at, resolved_at, assignee_id;
+            """,
+            (resolved_at, tenant_id, ticket_id),
+        )
+        updated = cur.fetchone()
+        return _row_to_ticket(updated) if updated else None
+
+def close_ticket(
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+) -> TicketRecord | None:
+    """Transition ticket to 'closed', requiring prior resolution.
+
+    Guarantees:
+    - Strictly scoped to tenant_id.
+    - Closing requires prior resolution ('resolved' status).
+    - Raises InvalidStatusTransitionError if ticket is in 'new', 'open', or 'pending'.
+    - If already 'closed', operation is idempotent and returns the current record.
+    - Does not alter or infer first_response_at or resolved_at.
+    - Caller owns the transaction; does not call commit().
+    - Returns updated TicketRecord or None if ticket not found.
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT id, tenant_id, external_id, subject, body, customer_email,
+                   status, category, priority, created_at,
+                   first_response_at, resolved_at, assignee_id
+            FROM tickets
+            WHERE tenant_id = %s AND id = %s
+            FOR UPDATE;
+            """,
+            (tenant_id, ticket_id),
+        )
+        current = cur.fetchone()
+        if not current:
+            return None
+
+        current_status = current["status"]
+        if current_status == "closed":
+            # Idempotent: already closed
+            return _row_to_ticket(current)
+
+        if current_status != "resolved":
+            raise InvalidStatusTransitionError(
+                f"Cannot close ticket {ticket_id}: ticket must be resolved first (current status: '{current_status}')."
+            )
+
+        cur.execute(
+            """
+            UPDATE tickets
+            SET status = 'closed'
+            WHERE tenant_id = %s AND id = %s
+            RETURNING id, tenant_id, external_id, subject, body, customer_email,
+                      status, category, priority, created_at,
+                      first_response_at, resolved_at, assignee_id;
+            """,
+            (tenant_id, ticket_id),
+        )
+        updated = cur.fetchone()
+        return _row_to_ticket(updated) if updated else None
 
