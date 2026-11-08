@@ -103,359 +103,372 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
     return `${mins}m (${days}d)`;
   };
 
+  const getPriorityBadgeStyle = (priority: string): React.CSSProperties => {
+    switch (priority) {
+      case 'urgent':
+        return { backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fca5a5' };
+      case 'high':
+        return { backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' };
+      case 'normal':
+        return { backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' };
+      case 'low':
+        return { backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' };
+      case 'default':
+        return { backgroundColor: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe' };
+      default:
+        return { backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' };
+    }
+  };
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <>
+      {/* 1. Translucent backdrop behind the panel */}
       <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '720px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'var(--bg-card)',
-          borderRadius: '8px',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.2)',
-          overflow: 'hidden',
+        className="sla-modal-backdrop"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* 2. Modal Overlay & Solid Panel */}
+      <div
+        className="sla-modal-overlay"
+        role="presentation"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
         }}
       >
-        {/* Header */}
         <div
-          style={{
-            padding: '16px 24px',
-            borderBottom: '1px solid var(--border-color)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
+          className="sla-modal-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sla-modal-title"
+          aria-describedby="sla-modal-desc"
         >
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-              Tenant SLA Policies
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-              Deterministic response and resolution targets scoped to your tenant.
-            </p>
+          {/* Header */}
+          <div className="sla-modal-header">
+            <div>
+              <h2
+                id="sla-modal-title"
+                style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}
+              >
+                Tenant SLA Policies
+              </h2>
+              <p
+                id="sla-modal-desc"
+                style={{ fontSize: '13px', color: '#475569', margin: '4px 0 0' }}
+              >
+                Deterministic response and resolution targets scoped to your tenant.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#64748b',
+                padding: '4px 8px',
+                lineHeight: 1,
+                borderRadius: '4px',
+              }}
+              aria-label="Close modal"
+              title="Close modal (Esc)"
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '20px',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              lineHeight: 1,
-            }}
-            aria-label="Close modal"
-          >
-            ×
-          </button>
-        </div>
 
-        {/* Scrollable Content */}
-        <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {!schemaAvailable && (
-            <div
-              style={{
-                backgroundColor: '#fff3cd',
-                color: '#856404',
-                border: '1px solid #ffeeba',
-                padding: '12px 16px',
-                borderRadius: '4px',
-                fontSize: '13px',
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>Schema Unavailable:</strong> Migration 008 (<code>sla_policies</code>) is not provisioned in the
-              active database. Policy writes will return 503 until the migration is executed.
-            </div>
-          )}
-
-          {error && (
-            <div className="alert alert-danger" style={{ margin: 0, fontSize: '13px' }}>
-              {error}
-            </div>
-          )}
-
-          {successMsg && (
-            <div
-              style={{
-                backgroundColor: '#d4edda',
-                color: '#155724',
-                border: '1px solid #c3e6cb',
-                padding: '10px 14px',
-                borderRadius: '4px',
-                fontSize: '13px',
-              }}
-            >
-              {successMsg}
-            </div>
-          )}
-
-          {/* Existing Policies List */}
-          <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>
-              Configured Policies ({policies.length})
-            </h3>
-
-            {loading ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                Loading policies...
-              </div>
-            ) : policies.length === 0 ? (
+          {/* Scrollable Content */}
+          <div className="sla-modal-body">
+            {!schemaAvailable && (
               <div
                 style={{
-                  backgroundColor: 'var(--bg-subtle)',
-                  padding: '16px',
-                  borderRadius: '4px',
-                  textAlign: 'center',
+                  backgroundColor: '#fffbeb',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
+                  padding: '12px 16px',
+                  borderRadius: '6px',
                   fontSize: '13px',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border-color)',
+                  lineHeight: 1.5,
                 }}
               >
-                No SLA policies configured for this tenant. Add a policy below.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--bg-subtle)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
-                      <th style={{ padding: '8px 12px', fontWeight: 600 }}>Priority Key</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 600 }}>First Response</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 600 }}>Resolution</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {policies.map((p) => (
-                      <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '8px 12px' }}>
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              textTransform: 'uppercase',
-                              fontSize: '11px',
-                              letterSpacing: '0.5px',
-                              padding: '2px 6px',
-                              borderRadius: '3px',
-                              backgroundColor: p.priority === 'default' ? '#e2e8f0' : 'var(--bg-subtle)',
-                              color: 'var(--text-main)',
-                            }}
-                          >
-                            {p.priority}
-                          </span>
-                        </td>
-                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>
-                          {formatMinutes(p.first_response_minutes)}
-                        </td>
-                        <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>
-                          {formatMinutes(p.resolution_minutes)}
-                        </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                          {confirmDeletePriority === p.priority ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Confirm?</span>
-                              <button
-                                type="button"
-                                disabled={deletingPriority === p.priority}
-                                onClick={() => handleDelete(p.priority)}
-                                style={{
-                                  padding: '2px 8px',
-                                  fontSize: '11px',
-                                  backgroundColor: 'var(--danger)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '3px',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {deletingPriority === p.priority ? '...' : 'Yes, Delete'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeletePriority(null)}
-                                style={{
-                                  padding: '2px 6px',
-                                  fontSize: '11px',
-                                  background: 'none',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: '3px',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={!schemaAvailable}
-                              onClick={() => setConfirmDeletePriority(p.priority)}
-                              style={{
-                                padding: '2px 8px',
-                                fontSize: '12px',
-                                background: 'none',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '3px',
-                                color: 'var(--danger)',
-                                cursor: schemaAvailable ? 'pointer' : 'not-allowed',
-                              }}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <strong style={{ color: '#78350f' }}>Schema Unavailable:</strong> Migration 008 (<code>sla_policies</code>) is not provisioned in the
+                active database. Policy writes will return 503 until the migration is executed.
               </div>
             )}
-          </div>
 
-          {/* Add / Update Policy Form */}
-          <div
-            style={{
-              borderTop: '1px solid var(--border-color)',
-              paddingTop: '16px',
-            }}
-          >
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px' }}>
-              Add or Update Policy
-            </h3>
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label
-                    htmlFor="sla-priority"
-                    style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}
-                  >
-                    Priority Key
-                  </label>
-                  <select
-                    id="sla-priority"
-                    value={selectedPriority}
-                    onChange={(e) => setSelectedPriority(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13px',
-                      backgroundColor: 'var(--bg-main)',
-                      color: 'var(--text-main)',
-                    }}
-                  >
-                    {VALID_PRIORITIES.map((p) => (
-                      <option key={p} value={p}>
-                        {p.toUpperCase()} {p === 'default' ? '(Tenant Default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="sla-fr-target"
-                    style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}
-                  >
-                    First Response (mins)
-                  </label>
-                  <input
-                    id="sla-fr-target"
-                    type="number"
-                    min={1}
-                    max={525600}
-                    value={firstResponseMinutes}
-                    onChange={(e) => setFirstResponseMinutes(parseInt(e.target.value, 10) || 0)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13px',
-                    }}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                    ≈ {formatMinutes(firstResponseMinutes)}
-                  </span>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="sla-res-target"
-                    style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}
-                  >
-                    Resolution (mins)
-                  </label>
-                  <input
-                    id="sla-res-target"
-                    type="number"
-                    min={1}
-                    max={525600}
-                    value={resolutionMinutes}
-                    onChange={(e) => setResolutionMinutes(parseInt(e.target.value, 10) || 0)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13px',
-                    }}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                    ≈ {formatMinutes(resolutionMinutes)}
-                  </span>
-                </div>
+            {error && (
+              <div className="alert alert-danger" style={{ margin: 0, fontSize: '13px' }}>
+                {error}
               </div>
+            )}
 
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-                <strong>Notice:</strong> Policy targets are evaluated deterministically against elapsed calendar time
-                using UTC timestamps. Saving or deleting a policy takes immediate effect on all tickets in this tenant.
-              </p>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={onClose}
-                  style={{ padding: '6px 14px', fontSize: '13px' }}
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={saving || !schemaAvailable}
-                  style={{ padding: '6px 16px', fontSize: '13px' }}
-                >
-                  {saving ? 'Saving...' : 'Save Policy'}
-                </button>
+            {successMsg && (
+              <div className="alert alert-success" style={{ margin: 0, fontSize: '13px' }}>
+                {successMsg}
               </div>
-            </form>
+            )}
+
+            {/* Existing Policies List */}
+            <div>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '10px' }}>
+                Configured Policies ({policies.length})
+              </h3>
+
+              {loading ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+                  Loading policies...
+                </div>
+              ) : policies.length === 0 ? (
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    padding: '20px',
+                    borderRadius: '6px',
+                    textAlign: 'center',
+                    fontSize: '13px',
+                    color: '#475569',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  No SLA policies configured for this tenant. Add a policy below.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                  <table className="sla-modal-table">
+                    <thead>
+                      <tr>
+                        <th>Priority Key</th>
+                        <th>First Response</th>
+                        <th>Resolution</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {policies.map((p) => {
+                        const badgeStyle = getPriorityBadgeStyle(p.priority);
+                        return (
+                          <tr key={p.id}>
+                            <td>
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  textTransform: 'uppercase',
+                                  fontSize: '11px',
+                                  letterSpacing: '0.5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  display: 'inline-block',
+                                  ...badgeStyle,
+                                }}
+                              >
+                                {p.priority} {p.priority === 'default' ? '(Tenant Default)' : ''}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: '#1e293b' }}>
+                              {formatMinutes(p.first_response_minutes)}
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: '#1e293b' }}>
+                              {formatMinutes(p.resolution_minutes)}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              {confirmDeletePriority === p.priority ? (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#b91c1c' }}>Delete?</span>
+                                  <button
+                                    type="button"
+                                    disabled={deletingPriority === p.priority}
+                                    onClick={() => handleDelete(p.priority)}
+                                    style={{
+                                      padding: '4px 10px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      backgroundColor: '#dc2626',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {deletingPriority === p.priority ? '...' : 'Yes, Delete'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeletePriority(null)}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '12px',
+                                      background: '#ffffff',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '4px',
+                                      color: '#334155',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={!schemaAvailable}
+                                  onClick={() => setConfirmDeletePriority(p.priority)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    background: '#ffffff',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '4px',
+                                    color: '#b91c1c',
+                                    cursor: schemaAvailable ? 'pointer' : 'not-allowed',
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Add / Update Policy Form */}
+            <div
+              style={{
+                borderTop: '1px solid #e2e8f0',
+                paddingTop: '18px',
+              }}
+            >
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '12px' }}>
+                Add or Update Policy
+              </h3>
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label
+                      htmlFor="sla-priority"
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                    >
+                      Priority Key
+                    </label>
+                    <select
+                      id="sla-priority"
+                      value={selectedPriority}
+                      onChange={(e) => setSelectedPriority(e.target.value)}
+                      className="sla-modal-input"
+                    >
+                      {VALID_PRIORITIES.map((p) => (
+                        <option key={p} value={p}>
+                          {p.toUpperCase()} {p === 'default' ? '(Tenant Default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="sla-fr-target"
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                    >
+                      First Response (mins)
+                    </label>
+                    <input
+                      id="sla-fr-target"
+                      type="number"
+                      min={1}
+                      max={525600}
+                      value={firstResponseMinutes}
+                      onChange={(e) => setFirstResponseMinutes(parseInt(e.target.value, 10) || 0)}
+                      className="sla-modal-input"
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#475569', marginTop: '4px', display: 'block' }}>
+                      ≈ {formatMinutes(firstResponseMinutes)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="sla-res-target"
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                    >
+                      Resolution (mins)
+                    </label>
+                    <input
+                      id="sla-res-target"
+                      type="number"
+                      min={1}
+                      max={525600}
+                      value={resolutionMinutes}
+                      onChange={(e) => setResolutionMinutes(parseInt(e.target.value, 10) || 0)}
+                      className="sla-modal-input"
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#475569', marginTop: '4px', display: 'block' }}>
+                      ≈ {formatMinutes(resolutionMinutes)}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    fontSize: '12px',
+                    color: '#334155',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong style={{ color: '#0f172a' }}>Notice:</strong> Policy targets are evaluated deterministically against elapsed calendar time
+                  using UTC timestamps. Saving or deleting a policy takes immediate effect on all tickets in this tenant.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      backgroundColor: '#ffffff',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !schemaAvailable}
+                    style={{
+                      padding: '8px 18px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      backgroundColor: saving || !schemaAvailable ? '#94a3b8' : '#1e3a8a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: saving || !schemaAvailable ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save Policy'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
