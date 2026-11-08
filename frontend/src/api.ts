@@ -7,6 +7,10 @@ import {
   SimilarFeedbackResponse,
   KBArticleSummary,
   RelevantKnowledgeResponse,
+  SLAPoliciesResponse,
+  SLAPolicyMutationResponse,
+  TicketSLAResponse,
+  LifecycleActionResponse,
 } from './types';
 
 class ApiClient {
@@ -39,6 +43,12 @@ class ApiClient {
         const errorJson = await response.json();
         if (errorJson?.error?.message) {
           errorMessage = errorJson.error.message;
+        } else if (typeof errorJson?.detail === 'string') {
+          errorMessage = errorJson.detail;
+        } else if (errorJson?.detail?.message) {
+          errorMessage = errorJson.detail.message;
+        } else if (errorJson?.message) {
+          errorMessage = errorJson.message;
         }
       } catch {
         // Fall back to HTTP status message
@@ -158,6 +168,78 @@ class ApiClient {
 
   async getRelevantKnowledge(ticketId: string): Promise<RelevantKnowledgeResponse> {
     return this.request<RelevantKnowledgeResponse>(`/browser-api/tickets/${ticketId}/relevant-knowledge`);
+  }
+
+  async getTicketSla(ticketId: string): Promise<TicketSLAResponse> {
+    return this.request<TicketSLAResponse>(`/browser-api/tickets/${ticketId}/sla`);
+  }
+
+  async recordFirstResponse(ticketId: string): Promise<LifecycleActionResponse> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<LifecycleActionResponse>(`/browser-api/tickets/${ticketId}/first-response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf_token: this.csrfToken }),
+    });
+  }
+
+  async resolveTicket(ticketId: string): Promise<LifecycleActionResponse> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<LifecycleActionResponse>(`/browser-api/tickets/${ticketId}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf_token: this.csrfToken }),
+    });
+  }
+
+  async closeTicket(ticketId: string): Promise<LifecycleActionResponse> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<LifecycleActionResponse>(`/browser-api/tickets/${ticketId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf_token: this.csrfToken }),
+    });
+  }
+
+  async getSlaPolicies(): Promise<SLAPoliciesResponse> {
+    return this.request<SLAPoliciesResponse>('/browser-api/sla/policies');
+  }
+
+  async upsertSlaPolicy(
+    priority: string,
+    firstResponseMinutes: number,
+    resolutionMinutes: number
+  ): Promise<SLAPolicyMutationResponse> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<SLAPolicyMutationResponse>('/browser-api/sla/policies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priority,
+        first_response_minutes: firstResponseMinutes,
+        resolution_minutes: resolutionMinutes,
+        csrf_token: this.csrfToken,
+      }),
+    });
+  }
+
+  async deleteSlaPolicy(priority: string): Promise<{ deleted: boolean; priority: string }> {
+    if (!this.csrfToken) {
+      await this.fetchCsrfToken();
+    }
+    return this.request<{ deleted: boolean; priority: string }>(`/browser-api/sla/policies/${priority}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf_token: this.csrfToken }),
+    });
   }
 }
 

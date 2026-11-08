@@ -43,6 +43,8 @@ export interface TicketDetail {
   category: string | null;
   priority: string | null;
   created_at: string | null;
+  first_response_at?: string | null;
+  resolved_at?: string | null;
 }
 
 export interface ModelPrediction {
@@ -131,4 +133,64 @@ export interface RelevantKnowledgeResponse {
   items: RelevantKnowledgeItem[];
   notice: string;
   message?: string | null;
+}
+
+export interface SLATargetEvaluation {
+  target_name: string;
+  target_minutes: number;
+  due_at: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  is_breached: boolean;
+  status: string; // "fulfilled", "breached", "active"
+  timeliness: string; // "on_time", "late", "on_track", "overdue"
+  timeliness_label?: string; // "Due now", "Overdue", "On track", "Fulfilled (on time)", "Breached (late)"
+  elapsed_minutes: number;
+  elapsed_fraction: number;
+  urgency: string; // "low", "medium", "high", "overdue", "completed"
+}
+
+export interface TicketSLAResponse {
+  schema_available: boolean;
+  is_configured: boolean;
+  policy_priority: string | null;
+  overall_status: string; // "schema_unavailable", "not_configured", "active", "breached", "fulfilled"
+  overall_urgency: string | null; // "low", "medium", "high", "overdue", "completed", null
+  evaluated_at: string;
+  first_response: SLATargetEvaluation | null;
+  resolution: SLATargetEvaluation | null;
+  urgency_notice: string;
+  message?: string | null;
+}
+
+export interface LifecycleTicketInfo {
+  id: string;
+  status: string;
+  first_response_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface LifecycleActionResponse {
+  ok: boolean;
+  ticket: LifecycleTicketInfo;
+}
+
+export interface SLAPolicyItem {
+  id: string;
+  priority: string;
+  first_response_minutes: number;
+  resolution_minutes: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface SLAPoliciesResponse {
+  schema_available: boolean;
+  policies: SLAPolicyItem[];
+  message?: string;
+}
+
+export interface SLAPolicyMutationResponse {
+  schema_available: boolean;
+  policy: SLAPolicyItem;
 }

@@ -16,6 +16,9 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, ValidationError, field_validator
+import psycopg
+import psycopg.errors
+from psycopg.rows import dict_row
 
 from app.config import get_settings
 from app.db import get_connection
@@ -31,15 +34,18 @@ from app.deps_browser import (
 from app.repositories.auth import get_user_by_email
 import app.repositories.duplicates as dup_repo
 import app.repositories.kb as kb_repo
+import app.repositories.sla as sla_repo
 from app.ml.chunking import chunk_article_text, ChunkingError
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
 from app.repositories.ml import get_prediction_with_model_for_ticket
 from app.repositories.tickets import (
+    InvalidStatusTransitionError,
     count_tickets,
     create_or_get_ticket,
     get_ticket_by_id,
     list_tickets_with_prediction,
 )
+from app.services.sla import evaluate_ticket_sla, TargetEvaluation
 from app.security import (
     create_access_token,
     decode_access_token,
@@ -518,6 +524,8 @@ def get_ticket_detail_json(
             "category": ticket.category,
             "priority": ticket.priority,
             "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+            "first_response_at": ticket.first_response_at.isoformat() if ticket.first_response_at else None,
+            "resolved_at": ticket.resolved_at.isoformat() if ticket.resolved_at else None,
         },
         "prediction": pred_data,
         "processing": processing_status,
@@ -949,4 +957,588 @@ def get_relevant_knowledge_json(
         "items": items,
         "notice": "Candidate knowledge-base excerpts based on exact cosine similarity against this ticket's embedding vector. Not a calibrated confidence score.",
         "message": messages.get(retrieval_status),
+    }
+
+
+def require_browser_admin(
+    principal: Principal = Depends(get_browser_principal_json),
+) -> Principal:
+    """Enforce admin-only authorization for browser API mutations."""
+    if principal.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "Admin privileges required."},
+        )
+    return principal
+
+
+def insert_audit_entry(
+    cur: psycopg.Cursor[Any],
+    tenant_id: uuid.UUID,
+    actor: str,
+    action: str,
+    at: datetime | None = None,
+) -> None:
+    """Insert an audit log record within the caller's active database transaction.
+
+    Per strict security boundaries, records strictly tenant_id, actor, action, and at.
+    Never stores customer complaint text, bodies, subjects, or personal data.
+    """
+    if at is not None:
+        cur.execute(
+            """
+            INSERT INTO audit_log (tenant_id, actor, action, at)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (tenant_id, actor, action, at),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO audit_log (tenant_id, actor, action)
+            VALUES (%s, %s, %s);
+            """,
+            (tenant_id, actor, action),
+        )
+
+
+class UpsertSLAPolicyPayload(BaseModel):
+    priority: str
+    first_response_minutes: int
+    resolution_minutes: int
+    csrf_token: str | None = None
+
+    @field_validator("priority")
+    @classmethod
+    def validate_priority(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in sla_repo.VALID_POLICY_PRIORITIES:
+            raise ValueError(
+                f"Invalid priority '{v}'. Must be one of {sorted(sla_repo.VALID_POLICY_PRIORITIES)}."
+            )
+        return clean
+
+    @field_validator("first_response_minutes", "resolution_minutes")
+    @classmethod
+    def validate_positive_minutes(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("Target minutes must be a positive integer.")
+        if v > sla_repo.MAX_DURATION_MINUTES:
+            raise ValueError(
+                f"Target minutes exceeds maximum allowed ({sla_repo.MAX_DURATION_MINUTES} minutes)."
+            )
+        return v
+
+
+@router.get("/sla/policies")
+def list_sla_policies_endpoint(
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """List tenant SLA policies. Returns empty list if migration 008 unapplied."""
+    response.headers["Cache-Control"] = "no-store"
+    with get_connection() as conn:
+        try:
+            policies = sla_repo.list_sla_policies(conn, principal.tenant_id)
+            return {
+                "schema_available": True,
+                "policies": [
+                    {
+                        "id": str(p.id),
+                        "priority": p.priority,
+                        "first_response_minutes": p.first_response_minutes,
+                        "resolution_minutes": p.resolution_minutes,
+                        "created_at": p.created_at.isoformat() if p.created_at else None,
+                        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+                    }
+                    for p in policies
+                ],
+            }
+        except sla_repo.SLASchemaUnavailableError:
+            return {
+                "schema_available": False,
+                "policies": [],
+                "message": "SLA policy schema not provisioned.",
+            }
+
+
+@router.post("/sla/policies")
+async def upsert_sla_policy_endpoint(
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(require_browser_admin),
+) -> dict[str, Any]:
+    """Admin-only: upsert SLA policy with atomic audit logging."""
+    response.headers["Cache-Control"] = "no-store"
+
+    raw_data = await read_bounded_json_body(request)
+    try:
+        payload = UpsertSLAPolicyPayload.model_validate(raw_data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+    validate_browser_csrf(request, "triage_session", payload.csrf_token)
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        try:
+            with conn.transaction():
+                policy = sla_repo.upsert_sla_policy(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    name=f"{payload.priority.capitalize()} Policy",
+                    priority=payload.priority,
+                    first_response_minutes=payload.first_response_minutes,
+                    resolution_minutes=payload.resolution_minutes,
+                )
+                with conn.cursor() as cur:
+                    insert_audit_entry(
+                        cur=cur,
+                        tenant_id=principal.tenant_id,
+                        actor=str(principal.id),
+                        action="sla_policy.upserted",
+                        at=now,
+                    )
+        except sla_repo.SLASchemaUnavailableError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"code": "schema_unavailable", "message": "SLA policy schema not provisioned."},
+            ) from exc
+
+    return {
+        "schema_available": True,
+        "policy": {
+            "id": str(policy.id),
+            "priority": policy.priority,
+            "first_response_minutes": policy.first_response_minutes,
+            "resolution_minutes": policy.resolution_minutes,
+            "created_at": policy.created_at.isoformat() if policy.created_at else None,
+            "updated_at": policy.updated_at.isoformat() if policy.updated_at else None,
+        },
+    }
+
+
+@router.delete("/sla/policies/{priority}")
+async def delete_sla_policy_endpoint(
+    priority: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(require_browser_admin),
+) -> dict[str, Any]:
+    """Admin-only: delete SLA policy with atomic audit logging."""
+    response.headers["Cache-Control"] = "no-store"
+
+    csrf_token = None
+    try:
+        raw_data = await read_bounded_json_body(request)
+        if isinstance(raw_data, dict):
+            csrf_token = raw_data.get("csrf_token")
+    except Exception:
+        pass
+    validate_browser_csrf(request, "triage_session", csrf_token)
+
+    clean_priority = priority.strip().lower()
+    if clean_priority not in sla_repo.VALID_POLICY_PRIORITIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "invalid_priority", "message": f"Invalid priority '{priority}'."},
+        )
+
+    now = datetime.now(timezone.utc)
+    with get_connection() as conn:
+        try:
+            with conn.transaction():
+                deleted = sla_repo.delete_sla_policy(
+                    conn=conn,
+                    tenant_id=principal.tenant_id,
+                    priority=clean_priority,
+                )
+                if not deleted:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail={"code": "not_found", "message": f"SLA policy for priority '{clean_priority}' not found."},
+                    )
+                with conn.cursor() as cur:
+                    insert_audit_entry(
+                        cur=cur,
+                        tenant_id=principal.tenant_id,
+                        actor=str(principal.id),
+                        action="sla_policy.deleted",
+                        at=now,
+                    )
+        except HTTPException:
+            raise
+        except sla_repo.SLASchemaUnavailableError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"code": "schema_unavailable", "message": "SLA policy schema not provisioned."},
+            ) from exc
+
+    return {"deleted": True, "priority": clean_priority}
+
+
+@router.get("/tickets/{ticket_id}/sla")
+def get_ticket_sla_endpoint(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Retrieve deterministic SLA target evaluation for a ticket."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        ticket = get_ticket_by_id(conn, principal.tenant_id, ticket_uuid)
+        if not ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        try:
+            policy = sla_repo.resolve_effective_policy(conn, principal.tenant_id, ticket.priority)
+            schema_available = True
+        except sla_repo.SLASchemaUnavailableError:
+            policy = None
+            schema_available = False
+
+    if not schema_available:
+        return {
+            "schema_available": False,
+            "is_configured": False,
+            "policy_priority": None,
+            "overall_status": "schema_unavailable",
+            "overall_urgency": None,
+            "evaluated_at": now.isoformat(),
+            "first_response": None,
+            "resolution": None,
+            "urgency_notice": (
+                "Rules-based operational urgency based on elapsed calendar time. "
+                "Does not represent a trained statistical SLA risk model or calibrated breach probability."
+            ),
+            "message": "SLA policy schema not provisioned.",
+        }
+
+    eval_result = evaluate_ticket_sla(
+        created_at=ticket.created_at,
+        priority=ticket.priority,
+        first_response_at=ticket.first_response_at,
+        resolved_at=ticket.resolved_at,
+        policy=policy,
+        current_time=now,
+    )
+
+    def format_target(t: TargetEvaluation | None) -> dict[str, Any] | None:
+        if not t:
+            return None
+        # Format label: at exact deadline incomplete target is "Due now"
+        if not t.is_completed:
+            if now == t.due_at:
+                label = "Due now"
+            elif now > t.due_at:
+                label = "Overdue"
+            else:
+                label = "On track"
+        else:
+            label = "Fulfilled (on time)" if t.timeliness == "on_time" else "Breached (late)"
+
+        return {
+            "target_name": t.target_name,
+            "target_minutes": t.target_minutes,
+            "due_at": t.due_at.isoformat(),
+            "is_completed": t.is_completed,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "is_breached": t.is_breached,
+            "status": t.status,
+            "timeliness": t.timeliness,
+            "timeliness_label": label,
+            "elapsed_minutes": round(t.elapsed_minutes, 1),
+            "elapsed_fraction": round(t.elapsed_fraction, 4),
+            "urgency": t.urgency,
+        }
+
+    return {
+        "schema_available": True,
+        "is_configured": eval_result.is_configured,
+        "policy_priority": eval_result.policy_priority,
+        "overall_status": eval_result.overall_status,
+        "overall_urgency": eval_result.overall_urgency,
+        "evaluated_at": eval_result.evaluated_at.isoformat(),
+        "first_response": format_target(eval_result.first_response),
+        "resolution": format_target(eval_result.resolution),
+        "urgency_notice": eval_result.urgency_notice,
+    }
+
+
+@router.post("/tickets/{ticket_id}/first-response")
+async def record_first_response_endpoint(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Agent lifecycle action: record first response timestamp with atomic audit logging."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    csrf_token = None
+    try:
+        raw_data = await read_bounded_json_body(request)
+        if isinstance(raw_data, dict):
+            csrf_token = raw_data.get("csrf_token")
+    except Exception:
+        pass
+    validate_browser_csrf(request, "triage_session", csrf_token)
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT id, tenant_id, status, first_response_at, resolved_at
+                    FROM tickets
+                    WHERE tenant_id = %s AND id = %s
+                    FOR UPDATE;
+                    """,
+                    (principal.tenant_id, ticket_uuid),
+                )
+                current = cur.fetchone()
+                if not current:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail={"code": "not_found", "message": "Ticket not found."},
+                    )
+
+                # Rejection of new first response event on resolved/closed tickets
+                # while already-recorded response remains idempotent
+                if current["first_response_at"] is None and current["status"] in ("resolved", "closed"):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "code": "invalid_transition",
+                            "message": f"Cannot record first response on {current['status']} ticket.",
+                        },
+                    )
+
+                if current["first_response_at"] is None:
+                    cur.execute(
+                        """
+                        UPDATE tickets
+                        SET first_response_at = %s
+                        WHERE tenant_id = %s AND id = %s
+                        RETURNING id, status, first_response_at, resolved_at;
+                        """,
+                        (now, principal.tenant_id, ticket_uuid),
+                    )
+                    updated = cur.fetchone()
+                    insert_audit_entry(
+                        cur=cur,
+                        tenant_id=principal.tenant_id,
+                        actor=str(principal.id),
+                        action="ticket.first_response_recorded",
+                        at=now,
+                    )
+                else:
+                    updated = current
+
+    return {
+        "ok": True,
+        "ticket": {
+            "id": str(updated["id"]),
+            "status": updated["status"],
+            "first_response_at": updated["first_response_at"].isoformat() if updated["first_response_at"] else None,
+            "resolved_at": updated["resolved_at"].isoformat() if updated["resolved_at"] else None,
+        },
+    }
+
+
+@router.post("/tickets/{ticket_id}/resolve")
+async def resolve_ticket_endpoint(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Agent lifecycle action: resolve ticket with atomic audit logging."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    csrf_token = None
+    try:
+        raw_data = await read_bounded_json_body(request)
+        if isinstance(raw_data, dict):
+            csrf_token = raw_data.get("csrf_token")
+    except Exception:
+        pass
+    validate_browser_csrf(request, "triage_session", csrf_token)
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT id, tenant_id, status, first_response_at, resolved_at
+                    FROM tickets
+                    WHERE tenant_id = %s AND id = %s
+                    FOR UPDATE;
+                    """,
+                    (principal.tenant_id, ticket_uuid),
+                )
+                current = cur.fetchone()
+                if not current:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail={"code": "not_found", "message": "Ticket not found."},
+                    )
+
+                if current["status"] == "closed":
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={"code": "invalid_transition", "message": "Cannot resolve a closed ticket."},
+                    )
+
+                if current["status"] != "resolved":
+                    cur.execute(
+                        """
+                        UPDATE tickets
+                        SET status = 'resolved',
+                            resolved_at = COALESCE(resolved_at, %s)
+                        WHERE tenant_id = %s AND id = %s
+                        RETURNING id, status, first_response_at, resolved_at;
+                        """,
+                        (now, principal.tenant_id, ticket_uuid),
+                    )
+                    updated = cur.fetchone()
+                    insert_audit_entry(
+                        cur=cur,
+                        tenant_id=principal.tenant_id,
+                        actor=str(principal.id),
+                        action="ticket.resolved",
+                        at=now,
+                    )
+                else:
+                    updated = current
+
+    return {
+        "ok": True,
+        "ticket": {
+            "id": str(updated["id"]),
+            "status": updated["status"],
+            "first_response_at": updated["first_response_at"].isoformat() if updated["first_response_at"] else None,
+            "resolved_at": updated["resolved_at"].isoformat() if updated["resolved_at"] else None,
+        },
+    }
+
+
+@router.post("/tickets/{ticket_id}/close")
+async def close_ticket_endpoint(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> dict[str, Any]:
+    """Agent lifecycle action: close resolved ticket with atomic audit logging."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    csrf_token = None
+    try:
+        raw_data = await read_bounded_json_body(request)
+        if isinstance(raw_data, dict):
+            csrf_token = raw_data.get("csrf_token")
+    except Exception:
+        pass
+    validate_browser_csrf(request, "triage_session", csrf_token)
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT id, tenant_id, status, first_response_at, resolved_at
+                    FROM tickets
+                    WHERE tenant_id = %s AND id = %s
+                    FOR UPDATE;
+                    """,
+                    (principal.tenant_id, ticket_uuid),
+                )
+                current = cur.fetchone()
+                if not current:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail={"code": "not_found", "message": "Ticket not found."},
+                    )
+
+                if current["status"] not in ("resolved", "closed"):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "code": "invalid_transition",
+                            "message": f"Cannot close ticket: ticket must be resolved first (current status: '{current['status']}').",
+                        },
+                    )
+
+                if current["status"] != "closed":
+                    cur.execute(
+                        """
+                        UPDATE tickets
+                        SET status = 'closed'
+                        WHERE tenant_id = %s AND id = %s
+                        RETURNING id, status, first_response_at, resolved_at;
+                        """,
+                        (principal.tenant_id, ticket_uuid),
+                    )
+                    updated = cur.fetchone()
+                    insert_audit_entry(
+                        cur=cur,
+                        tenant_id=principal.tenant_id,
+                        actor=str(principal.id),
+                        action="ticket.closed",
+                        at=now,
+                    )
+                else:
+                    updated = current
+
+    return {
+        "ok": True,
+        "ticket": {
+            "id": str(updated["id"]),
+            "status": updated["status"],
+            "first_response_at": updated["first_response_at"].isoformat() if updated["first_response_at"] else None,
+            "resolved_at": updated["resolved_at"].isoformat() if updated["resolved_at"] else None,
+        },
     }

@@ -8,6 +8,7 @@ import { TicketsListView } from './components/TicketsListView';
 import { TicketDetailView } from './components/TicketDetailView';
 import { CreateTicketView } from './components/CreateTicketView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
+import { SlaPoliciesModal } from './components/SlaPoliciesModal';
 import './App.css';
 
 type ViewMode = 'login' | 'tickets' | 'ticket-detail' | 'new-ticket' | 'knowledge-base';
@@ -24,6 +25,8 @@ export const App = () => {
     total_pages: 1,
   });
   const [loading, setLoading] = useState(true);
+  const [isSlaModalOpen, setIsSlaModalOpen] = useState(false);
+  const [slaPolicyVersion, setSlaPolicyVersion] = useState(0);
 
   // Sync initial URL path
   const syncFromPath = (currentUser: User | null) => {
@@ -181,6 +184,7 @@ export const App = () => {
         }}
         currentView={view}
         onNavigateKB={handleNavigateKB}
+        onOpenSlaModal={() => setIsSlaModalOpen(true)}
       />
 
       <main className="main-content">
@@ -219,6 +223,14 @@ export const App = () => {
             ticketId={selectedTicketId}
             onBack={handleBackToQueue}
             onSelectTicket={handleSelectTicket}
+            slaPolicyVersion={slaPolicyVersion}
+          />
+        )}
+
+        {isSlaModalOpen && user?.role === 'admin' && (
+          <SlaPoliciesModal
+            onClose={() => setIsSlaModalOpen(false)}
+            onPolicyChanged={() => setSlaPolicyVersion((v) => v + 1)}
           />
         )}
       </main>

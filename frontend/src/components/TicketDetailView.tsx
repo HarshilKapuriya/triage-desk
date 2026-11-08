@@ -1,15 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { TicketDetailResponse, SimilarTicketsResponse, RelevantKnowledgeResponse } from '../types';
+import {
+  TicketDetailResponse,
+  SimilarTicketsResponse,
+  RelevantKnowledgeResponse,
+  TicketSLAResponse,
+} from '../types';
 import { ProcessingBadge } from './ProcessingBadge';
 
 interface TicketDetailViewProps {
   ticketId: string;
   onBack: () => void;
   onSelectTicket?: (ticketId: string) => void;
+  slaPolicyVersion?: number;
 }
 
-export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDetailViewProps) => {
+const formatDuration = (mins: number) => {
+  if (mins < 60) return `${mins}m`;
+  const hours = (mins / 60).toFixed(1).replace('.0', '');
+  if (mins < 1440) return `${mins}m (${hours}h)`;
+  const days = (mins / 1440).toFixed(1).replace('.0', '');
+  return `${mins}m (${days}d)`;
+};
+
+export const TicketDetailView = ({
+  ticketId,
+  onBack,
+  onSelectTicket,
+  slaPolicyVersion,
+}: TicketDetailViewProps) => {
   const [data, setData] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,13 +42,22 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
   const [knowledgeLoading, setKnowledgeLoading] = useState(true);
   const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
 
+  const [slaData, setSlaData] = useState<TicketSLAResponse | null>(null);
+  const [slaLoading, setSlaLoading] = useState(true);
+  const [slaError, setSlaError] = useState<string | null>(null);
+
+  const [lifecyclePending, setLifecyclePending] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+
   const [rowPendingId, setRowPendingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<{ [ticketId: string]: string }>({});
 
   const currentTicketIdRef = useRef(ticketId);
   currentTicketIdRef.current = ticketId;
+  const requestSeqRef = useRef(0);
 
   const loadTicketData = async (targetTicketId: string, isManualRefresh = false) => {
+    const seq = ++requestSeqRef.current;
     if (isManualRefresh) {
       setRefreshing(true);
     } else {
@@ -37,33 +65,43 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
       setData(null);
       setSimilarData(null);
       setKnowledgeData(null);
+      setSlaData(null);
     }
     setError(null);
     setSimilarLoading(true);
     setSimilarError(null);
     setKnowledgeLoading(true);
     setKnowledgeError(null);
+    setSlaLoading(true);
+    setSlaError(null);
+    setLifecycleError(null);
     setRowPendingId(null);
     setRowErrors({});
 
     try {
-      const [ticketRes, similarRes, knowledgeRes] = await Promise.all([
+      const [ticketRes, similarRes, knowledgeRes, slaRes] = await Promise.all([
         api.getTicketDetail(targetTicketId),
         api.getSimilarTickets(targetTicketId).catch((err) => {
-          if (currentTicketIdRef.current === targetTicketId) {
+          if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
             setSimilarError(err instanceof Error ? err.message : 'Failed to fetch similar tickets.');
           }
           return null;
         }),
         api.getRelevantKnowledge(targetTicketId).catch((err) => {
-          if (currentTicketIdRef.current === targetTicketId) {
+          if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
             setKnowledgeError(err instanceof Error ? err.message : 'Failed to fetch relevant knowledge.');
+          }
+          return null;
+        }),
+        api.getTicketSla(targetTicketId).catch((err) => {
+          if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
+            setSlaError(err instanceof Error ? err.message : 'Failed to fetch SLA evaluation.');
           }
           return null;
         }),
       ]);
 
-      if (currentTicketIdRef.current !== targetTicketId) {
+      if (requestSeqRef.current !== seq || currentTicketIdRef.current !== targetTicketId) {
         return;
       }
 
@@ -79,14 +117,19 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
       } else if (!knowledgeRes) {
         setKnowledgeData(null);
       }
+
+      if (slaRes) {
+        setSlaData(slaRes);
+      }
     } catch (err) {
-      if (currentTicketIdRef.current === targetTicketId) {
+      if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
         setError(err instanceof Error ? err.message : 'Failed to load ticket.');
       }
     } finally {
-      if (currentTicketIdRef.current === targetTicketId) {
+      if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
         setSimilarLoading(false);
         setKnowledgeLoading(false);
+        setSlaLoading(false);
         if (isManualRefresh) {
           setRefreshing(false);
         } else {
@@ -96,10 +139,125 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
     }
   };
 
+  const refreshSlaOnly = async (targetTicketId: string) => {
+    const seq = ++requestSeqRef.current;
+    try {
+      const res = await api.getTicketSla(targetTicketId);
+      if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
+        setSlaData(res);
+        setSlaError(null);
+      }
+    } catch (err: unknown) {
+      if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
+        // Discard silent SLA refresh errors to avoid flickering
+      }
+    }
+  };
+
+  const handleRecordFirstResponse = async () => {
+    const originId = ticketId;
+    setLifecyclePending(true);
+    setLifecycleError(null);
+    try {
+      const res = await api.recordFirstResponse(originId);
+      if (currentTicketIdRef.current === originId) {
+        setData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            ticket: {
+              ...prev.ticket,
+              first_response_at: res.ticket.first_response_at,
+            },
+          };
+        });
+        await refreshSlaOnly(originId);
+      }
+    } catch (err: unknown) {
+      if (currentTicketIdRef.current === originId) {
+        setLifecycleError(err instanceof Error ? err.message : 'Failed to record first response.');
+      }
+    } finally {
+      if (currentTicketIdRef.current === originId) {
+        setLifecyclePending(false);
+      }
+    }
+  };
+
+  const handleResolveTicket = async () => {
+    const originId = ticketId;
+    setLifecyclePending(true);
+    setLifecycleError(null);
+    try {
+      const res = await api.resolveTicket(originId);
+      if (currentTicketIdRef.current === originId) {
+        setData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            ticket: {
+              ...prev.ticket,
+              status: res.ticket.status,
+              resolved_at: res.ticket.resolved_at,
+            },
+          };
+        });
+        await refreshSlaOnly(originId);
+      }
+    } catch (err: unknown) {
+      if (currentTicketIdRef.current === originId) {
+        setLifecycleError(err instanceof Error ? err.message : 'Failed to resolve ticket.');
+      }
+    } finally {
+      if (currentTicketIdRef.current === originId) {
+        setLifecyclePending(false);
+      }
+    }
+  };
+
+  const handleCloseTicket = async () => {
+    const originId = ticketId;
+    setLifecyclePending(true);
+    setLifecycleError(null);
+    try {
+      const res = await api.closeTicket(originId);
+      if (currentTicketIdRef.current === originId) {
+        setData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            ticket: {
+              ...prev.ticket,
+              status: res.ticket.status,
+            },
+          };
+        });
+        await refreshSlaOnly(originId);
+      }
+    } catch (err: unknown) {
+      if (currentTicketIdRef.current === originId) {
+        setLifecycleError(err instanceof Error ? err.message : 'Failed to close ticket.');
+      }
+    } finally {
+      if (currentTicketIdRef.current === originId) {
+        setLifecyclePending(false);
+      }
+    }
+  };
+
   useEffect(() => {
     currentTicketIdRef.current = ticketId;
     loadTicketData(ticketId, false);
+    return () => {
+      requestSeqRef.current++;
+    };
   }, [ticketId]);
+
+  useEffect(() => {
+    if (slaPolicyVersion && slaPolicyVersion > 0) {
+      refreshSlaOnly(ticketId);
+    }
+  }, [slaPolicyVersion, ticketId]);
 
   const handleRefresh = () => {
     loadTicketData(ticketId, true);
@@ -249,8 +407,127 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
             Received:{' '}
             {ticket.created_at ? new Date(ticket.created_at).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '—'}
           </span>
+          {ticket.first_response_at && (
+            <span>
+              First Response:{' '}
+              <strong style={{ color: 'var(--text-main)' }}>
+                {new Date(ticket.first_response_at).toISOString().replace('T', ' ').slice(0, 19)} UTC
+              </strong>
+            </span>
+          )}
+          {ticket.resolved_at && (
+            <span>
+              Resolved:{' '}
+              <strong style={{ color: 'var(--text-main)' }}>
+                {new Date(ticket.resolved_at).toISOString().replace('T', ' ').slice(0, 19)} UTC
+              </strong>
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Lifecycle Actions Bar */}
+      <div
+        className="card"
+        style={{
+          marginBottom: '20px',
+          padding: '14px 20px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          backgroundColor: 'var(--bg-card)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Agent Lifecycle Actions
+          </span>
+          {lifecyclePending && (
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Updating state...</span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          {/* 1. Record First Response */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={
+              lifecyclePending ||
+              Boolean(ticket.first_response_at) ||
+              ticket.status === 'resolved' ||
+              ticket.status === 'closed'
+            }
+            onClick={handleRecordFirstResponse}
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+            title={
+              ticket.first_response_at
+                ? `First response already recorded at ${new Date(ticket.first_response_at).toISOString().replace('T', ' ').slice(0, 19)} UTC`
+                : ticket.status === 'resolved' || ticket.status === 'closed'
+                ? `Cannot record first response on ${ticket.status} ticket`
+                : 'Record customer response timestamp'
+            }
+          >
+            {ticket.first_response_at ? '✓ First Response Recorded' : 'Record First Response'}
+          </button>
+
+          {/* 2. Resolve Ticket */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={
+              lifecyclePending ||
+              ticket.status === 'resolved' ||
+              ticket.status === 'closed'
+            }
+            onClick={handleResolveTicket}
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+            title={
+              ticket.status === 'resolved'
+                ? 'Ticket is already resolved'
+                : ticket.status === 'closed'
+                ? 'Closed ticket cannot be resolved'
+                : 'Mark ticket as resolved'
+            }
+          >
+            {ticket.status === 'resolved' ? '✓ Resolved' : 'Resolve Ticket'}
+          </button>
+
+          {/* 3. Close Ticket */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={lifecyclePending || ticket.status !== 'resolved'}
+            onClick={handleCloseTicket}
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+            title={
+              ticket.status === 'closed'
+                ? 'Ticket is already closed'
+                : ticket.status !== 'resolved'
+                ? `Ticket must be resolved before closing (current: ${ticket.status})`
+                : 'Close resolved ticket'
+            }
+          >
+            {ticket.status === 'closed' ? '✓ Closed' : 'Close Ticket'}
+          </button>
+        </div>
+      </div>
+
+      {lifecycleError && (
+        <div className="alert alert-danger" style={{ marginBottom: '20px', fontSize: '13px' }}>
+          {lifecycleError}
+        </div>
+      )}
 
       {/* Two-Column Grid */}
       <div
@@ -771,6 +1048,216 @@ export const TicketDetailView = ({ ticketId, onBack, onSelectTicket }: TicketDet
 
         {/* Right: Triage & Model Diagnostics */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Card: SLA Target & Timeliness */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: 'var(--text-main)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  margin: 0,
+                }}
+              >
+                SLA Target & Timeliness
+              </h2>
+              {slaData?.schema_available && slaData?.is_configured && (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <span
+                    className={`badge ${
+                      slaData.overall_status === 'breached'
+                        ? 'badge-failed'
+                        : slaData.overall_status === 'fulfilled'
+                        ? 'badge-ready'
+                        : 'badge-pred'
+                    }`}
+                    style={{ textTransform: 'uppercase' }}
+                  >
+                    {slaData.overall_status}
+                  </span>
+                  {slaData.overall_urgency && (
+                    <span
+                      className={`badge ${
+                        slaData.overall_urgency === 'overdue'
+                          ? 'badge-failed'
+                          : slaData.overall_urgency === 'high'
+                          ? 'badge-pending'
+                          : 'badge-ready'
+                      }`}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {slaData.overall_urgency} Urgency
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {slaLoading ? (
+              <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Evaluating SLA targets...
+              </div>
+            ) : slaError ? (
+              <div className="alert alert-danger" style={{ margin: 0, fontSize: '12px' }}>
+                {slaError}
+              </div>
+            ) : !slaData?.schema_available ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '12px 14px',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  SLA Schema Unavailable
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  Migration 008 is not provisioned in the database. SLA target evaluation and policy enforcement are
+                  inactive.
+                </p>
+              </div>
+            ) : !slaData?.is_configured ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '12px 14px',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  No SLA Policy Configured
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  No matching policy for priority <code>{ticket.priority || 'default'}</code> or tenant default.
+                  Configure targets via the Admin SLA Policies menu.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
+                {/* First Response Row */}
+                {slaData.first_response && (
+                  <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>First Response Target</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {formatDuration(slaData.first_response.target_minutes)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Due: {new Date(slaData.first_response.due_at).toISOString().replace('T', ' ').slice(0, 16)} UTC
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color:
+                            slaData.first_response.timeliness_label === 'Due now' ||
+                            slaData.first_response.is_breached
+                              ? 'var(--danger)'
+                              : slaData.first_response.is_completed
+                              ? '#137333'
+                              : 'var(--primary)',
+                        }}
+                      >
+                        {slaData.first_response.timeliness_label ||
+                          (slaData.first_response.is_completed ? 'Fulfilled' : 'On track')}
+                      </span>
+                    </div>
+                    {slaData.first_response.completed_at && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Completed:{' '}
+                        {new Date(slaData.first_response.completed_at).toISOString().replace('T', ' ').slice(0, 16)} UTC
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Resolution Row */}
+                {slaData.resolution && (
+                  <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Resolution Target</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {formatDuration(slaData.resolution.target_minutes)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Due: {new Date(slaData.resolution.due_at).toISOString().replace('T', ' ').slice(0, 16)} UTC
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color:
+                            slaData.resolution.timeliness_label === 'Due now' ||
+                            slaData.resolution.is_breached
+                              ? 'var(--danger)'
+                              : slaData.resolution.is_completed
+                              ? '#137333'
+                              : 'var(--primary)',
+                        }}
+                      >
+                        {slaData.resolution.timeliness_label ||
+                          (slaData.resolution.is_completed ? 'Fulfilled' : 'On track')}
+                      </span>
+                    </div>
+                    {slaData.resolution.completed_at && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Resolved:{' '}
+                        {new Date(slaData.resolution.completed_at).toISOString().replace('T', ' ').slice(0, 16)} UTC
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Notice */}
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  <strong>Notice:</strong> {slaData.urgency_notice}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Card 1: Human Triage Assignment */}
           <div className="card" style={{ padding: '20px' }}>
             <h2

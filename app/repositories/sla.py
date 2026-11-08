@@ -15,10 +15,24 @@ from typing import Any
 import uuid
 
 import psycopg
+import psycopg.errors
 from psycopg.rows import dict_row
 
 VALID_POLICY_PRIORITIES = {"low", "normal", "high", "urgent", "default"}
 MAX_DURATION_MINUTES = 525600  # 365 days in minutes
+
+
+class SLASchemaUnavailableError(Exception):
+    """Raised when the sla_policies table does not exist in the database (migration 008 unapplied)."""
+    pass
+
+
+def _is_sla_policies_undefined(exc: psycopg.errors.UndefinedTable) -> bool:
+    """Determine whether an UndefinedTable error was specifically caused by sla_policies."""
+    table_name = getattr(getattr(exc, "diag", None), "table_name", None)
+    if table_name:
+        return table_name == "sla_policies"
+    return "sla_policies" in str(exc).lower()
 
 
 @dataclass(frozen=True)
@@ -51,7 +65,7 @@ def _row_to_policy(row: dict[str, Any]) -> SLAPolicyRecord:
 def upsert_sla_policy(
     conn: psycopg.Connection[Any],
     tenant_id: uuid.UUID,
-    name: str,
+    name: str | None,
     priority: str,
     first_response_minutes: int,
     resolution_minutes: int,
@@ -60,15 +74,18 @@ def upsert_sla_policy(
 
     Caller owns the transaction.
     """
-    clean_name = name.strip() if name else ""
-    if not clean_name:
-        raise ValueError("SLA policy name must not be empty.")
-
     clean_priority = priority.strip().lower() if priority else ""
     if clean_priority not in VALID_POLICY_PRIORITIES:
         raise ValueError(
             f"Invalid SLA policy priority '{priority}'. Must be one of {sorted(VALID_POLICY_PRIORITIES)}."
         )
+
+    if name is None:
+        clean_name = f"{clean_priority.capitalize()} Policy"
+    else:
+        clean_name = name.strip()
+    if not clean_name:
+        raise ValueError("SLA policy name must not be empty.")
 
     if not isinstance(first_response_minutes, int) or first_response_minutes <= 0:
         raise ValueError(f"first_response_minutes must be a positive integer (received {first_response_minutes}).")
@@ -80,27 +97,33 @@ def upsert_sla_policy(
     if resolution_minutes > MAX_DURATION_MINUTES:
         raise ValueError(f"resolution_minutes exceeds maximum allowed ({MAX_DURATION_MINUTES} minutes).")
 
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            INSERT INTO sla_policies (
-                tenant_id, name, priority, first_response_minutes, resolution_minutes
-            ) VALUES (
-                %s, %s, %s, %s, %s
-            )
-            ON CONFLICT (tenant_id, priority) DO UPDATE SET
-                name = EXCLUDED.name,
-                first_response_minutes = EXCLUDED.first_response_minutes,
-                resolution_minutes = EXCLUDED.resolution_minutes,
-                updated_at = NOW()
-            RETURNING id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at;
-            """,
-            (tenant_id, clean_name, clean_priority, first_response_minutes, resolution_minutes),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise RuntimeError("Failed to upsert SLA policy: no row returned.")
-        return _row_to_policy(row)
+    try:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO sla_policies (
+                        tenant_id, name, priority, first_response_minutes, resolution_minutes
+                    ) VALUES (
+                        %s, %s, %s, %s, %s
+                    )
+                    ON CONFLICT (tenant_id, priority) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        first_response_minutes = EXCLUDED.first_response_minutes,
+                        resolution_minutes = EXCLUDED.resolution_minutes,
+                        updated_at = NOW()
+                    RETURNING id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at;
+                    """,
+                    (tenant_id, clean_name, clean_priority, first_response_minutes, resolution_minutes),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise RuntimeError("Failed to upsert SLA policy: no row returned.")
+                return _row_to_policy(row)
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_sla_policies_undefined(exc):
+            raise SLASchemaUnavailableError("SLA policy schema is not provisioned.") from exc
+        raise
 
 
 def get_sla_policy_by_priority(
@@ -110,35 +133,48 @@ def get_sla_policy_by_priority(
 ) -> SLAPolicyRecord | None:
     """Fetch an SLA policy by priority key scoped strictly to tenant_id."""
     clean_priority = priority.strip().lower() if priority else ""
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
-            FROM sla_policies
-            WHERE tenant_id = %s AND priority = %s;
-            """,
-            (tenant_id, clean_priority),
-        )
-        row = cur.fetchone()
-        return _row_to_policy(row) if row else None
+    try:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
+                    FROM sla_policies
+                    WHERE tenant_id = %s AND priority = %s;
+                    """,
+                    (tenant_id, clean_priority),
+                )
+                row = cur.fetchone()
+                return _row_to_policy(row) if row else None
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_sla_policies_undefined(exc):
+            raise SLASchemaUnavailableError("SLA policy schema is not provisioned.") from exc
+        raise
+
 
 def list_sla_policies(
     conn: psycopg.Connection[Any],
     tenant_id: uuid.UUID,
 ) -> list[SLAPolicyRecord]:
     """List all SLA policies scoped strictly to tenant_id."""
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
-            FROM sla_policies
-            WHERE tenant_id = %s
-            ORDER BY priority ASC, name ASC;
-            """,
-            (tenant_id,),
-        )
-        rows = cur.fetchall()
-        return [_row_to_policy(r) for r in rows]
+    try:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
+                    FROM sla_policies
+                    WHERE tenant_id = %s
+                    ORDER BY priority ASC, name ASC;
+                    """,
+                    (tenant_id,),
+                )
+                rows = cur.fetchall()
+                return [_row_to_policy(r) for r in rows]
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_sla_policies_undefined(exc):
+            raise SLASchemaUnavailableError("SLA policy schema is not provisioned.") from exc
+        raise
 
 
 def delete_sla_policy(
@@ -151,16 +187,22 @@ def delete_sla_policy(
     Returns True if a row was deleted, False otherwise. Caller owns the transaction.
     """
     clean_priority = priority.strip().lower() if priority else ""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            DELETE FROM sla_policies
-            WHERE tenant_id = %s AND priority = %s
-            RETURNING id;
-            """,
-            (tenant_id, clean_priority),
-        )
-        return cur.fetchone() is not None
+    try:
+        with conn.transaction():
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM sla_policies
+                    WHERE tenant_id = %s AND priority = %s
+                    RETURNING id;
+                    """,
+                    (tenant_id, clean_priority),
+                )
+                return cur.fetchone() is not None
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_sla_policies_undefined(exc):
+            raise SLASchemaUnavailableError("SLA policy schema is not provisioned.") from exc
+        raise
 
 
 def resolve_effective_policy(
@@ -181,29 +223,35 @@ def resolve_effective_policy(
     """
     clean_prio = ticket_priority.strip().lower() if ticket_priority else None
 
-    with conn.cursor(row_factory=dict_row) as cur:
-        if clean_prio is not None:
-            cur.execute(
-                """
-                SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
-                FROM sla_policies
-                WHERE tenant_id = %s
-                  AND (priority = %s OR priority = 'default')
-                ORDER BY (CASE WHEN priority = %s THEN 0 ELSE 1 END) ASC
-                LIMIT 1;
-                """,
-                (tenant_id, clean_prio, clean_prio),
-            )
-        else:
-            cur.execute(
-                """
-                SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
-                FROM sla_policies
-                WHERE tenant_id = %s
-                  AND priority = 'default'
-                LIMIT 1;
-                """,
-                (tenant_id,),
-            )
-        row = cur.fetchone()
-        return _row_to_policy(row) if row else None
+    try:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                if clean_prio is not None:
+                    cur.execute(
+                        """
+                        SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
+                        FROM sla_policies
+                        WHERE tenant_id = %s
+                          AND (priority = %s OR priority = 'default')
+                        ORDER BY (CASE WHEN priority = %s THEN 0 ELSE 1 END) ASC
+                        LIMIT 1;
+                        """,
+                        (tenant_id, clean_prio, clean_prio),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT id, tenant_id, name, priority, first_response_minutes, resolution_minutes, created_at, updated_at
+                        FROM sla_policies
+                        WHERE tenant_id = %s
+                          AND priority = 'default'
+                        LIMIT 1;
+                        """,
+                        (tenant_id,),
+                    )
+                row = cur.fetchone()
+                return _row_to_policy(row) if row else None
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_sla_policies_undefined(exc):
+            raise SLASchemaUnavailableError("SLA policy schema is not provisioned.") from exc
+        raise

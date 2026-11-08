@@ -276,7 +276,7 @@ def record_first_response(
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            SELECT id, tenant_id, created_at, first_response_at
+            SELECT id, tenant_id, created_at, first_response_at, status
             FROM tickets
             WHERE tenant_id = %s AND id = %s
             FOR UPDATE;
@@ -286,6 +286,12 @@ def record_first_response(
         current = cur.fetchone()
         if not current:
             return None
+
+        # Rejection of new first response event on resolved/closed tickets (while already-recorded response remains idempotent)
+        if current.get("first_response_at") is None and current.get("status") in ("resolved", "closed"):
+            raise InvalidStatusTransitionError(
+                f"Cannot record first response on {current['status']} ticket {ticket_id}."
+            )
 
         created_at = current.get("created_at")
         if created_at is not None and responded_at < created_at:

@@ -174,6 +174,57 @@ def test_record_first_response_repository():
     assert "first_response_at = COALESCE(first_response_at, %s)" in sql
 
 
+def test_record_first_response_rejects_resolved_or_closed_when_unset():
+    conn = MagicMock()
+    cur = conn.cursor.return_value.__enter__.return_value
+    tenant_id = uuid.uuid4()
+    ticket_id = uuid.uuid4()
+    resp_time = datetime(2026, 11, 8, 11, 0, tzinfo=UTC)
+
+    # 1. Reject on resolved ticket when first_response_at is unset
+    cur.fetchone.return_value = {
+        "id": ticket_id,
+        "tenant_id": tenant_id,
+        "status": "resolved",
+        "created_at": datetime(2026, 11, 8, 10, 0, tzinfo=UTC),
+        "first_response_at": None,
+    }
+    with pytest.raises(ticket_repo.InvalidStatusTransitionError, match="Cannot record first response on resolved ticket"):
+        ticket_repo.record_first_response(conn, tenant_id, ticket_id, resp_time)
+
+    # 2. Reject on closed ticket when first_response_at is unset
+    cur.fetchone.return_value = {
+        "id": ticket_id,
+        "tenant_id": tenant_id,
+        "status": "closed",
+        "created_at": datetime(2026, 11, 8, 10, 0, tzinfo=UTC),
+        "first_response_at": None,
+    }
+    with pytest.raises(ticket_repo.InvalidStatusTransitionError, match="Cannot record first response on closed ticket"):
+        ticket_repo.record_first_response(conn, tenant_id, ticket_id, resp_time)
+
+    # 3. Idempotent preservation if first_response_at is already set on resolved/closed ticket
+    prior_resp = datetime(2026, 11, 8, 10, 30, tzinfo=UTC)
+    cur.fetchone.return_value = {
+        "id": ticket_id,
+        "tenant_id": tenant_id,
+        "external_id": None,
+        "subject": "Test",
+        "body": "Body",
+        "customer_email": None,
+        "status": "resolved",
+        "category": None,
+        "priority": "normal",
+        "created_at": datetime(2026, 11, 8, 10, 0, tzinfo=UTC),
+        "first_response_at": prior_resp,
+        "resolved_at": datetime(2026, 11, 8, 11, 30, tzinfo=UTC),
+        "assignee_id": None,
+    }
+    t = ticket_repo.record_first_response(conn, tenant_id, ticket_id, resp_time)
+    assert t is not None
+    assert t.first_response_at == prior_resp
+
+
 def test_resolve_ticket_transitions():
     conn = MagicMock()
     cur = conn.cursor.return_value.__enter__.return_value
