@@ -142,9 +142,18 @@ def synthetic_tenant(conn: psycopg.Connection[Any]) -> Generator[tuple[uuid.UUID
     try:
         yield tenant_id, user_id
     finally:
-        with conn.transaction():
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM tenants WHERE id = %s;", (tenant_id,))
+        try:
+            if not conn.closed:
+                if conn.info.transaction_status in (
+                    psycopg.pq.TransactionStatus.INERROR,
+                    psycopg.pq.TransactionStatus.INTRANS,
+                ):
+                    conn.rollback()
+                with conn.transaction():
+                    with conn.cursor() as cur:
+                        cur.execute("DELETE FROM tenants WHERE id = %s;", (tenant_id,))
+        except Exception:
+            pass
 
 
 # 1. Migration Execution and Catalog Inspection
@@ -340,6 +349,7 @@ def test_05_sequential_and_concurrent_duplicate_lifecycle_requests(
     with conn.transaction():
         with conn.cursor() as cur:
             cur.execute("UPDATE tickets SET status = 'open' WHERE id = %s;", (ticket.id,))
+    conn.commit()
 
     session_token = create_access_token(
         user_id=user_id,
@@ -376,6 +386,7 @@ def test_05_sequential_and_concurrent_duplicate_lifecycle_requests(
     with conn.transaction():
         with conn.cursor() as cur:
             cur.execute("UPDATE tickets SET status = 'open' WHERE id = %s;", (t2.id,))
+    conn.commit()
 
     def post_fr():
         c = TestClient(app, cookies=cookies)
@@ -447,10 +458,14 @@ def test_07_browser_and_repository_lifecycle_parity(
     with conn.transaction():
         with conn.cursor() as cur:
             cur.execute("UPDATE tickets SET status = 'open' WHERE id IN (%s, %s);", (t_repo.id, t_browser.id))
+    conn.commit()
 
     # Path A: Repository resolve
     now = datetime.now(timezone.utc)
-    rec_repo = ticket_repo.resolve_ticket(conn, tenant_id, t_repo.id, resolved_at=now, actor_id=str(user_id))
+    with conn.transaction():
+        rec_repo = ticket_repo.resolve_ticket(conn, tenant_id, t_repo.id, resolved_at=now, actor_id=str(user_id))
+    conn.commit()
+    assert rec_repo is not None
     assert rec_repo.status == "resolved"
 
     # Path B: Browser endpoint resolve
