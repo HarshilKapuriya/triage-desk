@@ -99,153 +99,180 @@ def test_dashboard_sql_aggregation_and_two_tenant_isolation():
                 resolution_minutes=480,
             )
 
-            # Insert Tenant A Tickets:
+            # Insert Tenant A Tickets using supported arguments (returns (TicketRecord, is_created))
             # Ticket 1 (urgent): created 20m ago, incomplete -> due at +30m (in 10m) -> incomplete_before
-            t1 = ticket_repo.create_or_get_ticket(
+            t1, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a1@test.com",
                 subject="Tenant A - T1",
                 body="Body",
-                priority="urgent",
             )
             # Ticket 2 (urgent): created 30m ago, incomplete -> due at +30m (now!) -> incomplete_due_now
-            t2 = ticket_repo.create_or_get_ticket(
+            t2, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a2@test.com",
                 subject="Tenant A - T2",
                 body="Body",
-                priority="urgent",
             )
             # Ticket 3 (urgent): created 40m ago, response at +20m (on-time), resolved at +150m (late)
-            t3 = ticket_repo.create_or_get_ticket(
+            t3, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a3@test.com",
                 subject="Tenant A - T3",
                 body="Body",
-                priority="urgent",
             )
             # Ticket 4 (normal -> default policy: 60m/240m): created 80m ago, response at +90m (late), incomplete resolution
-            t4 = ticket_repo.create_or_get_ticket(
+            t4, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a4@test.com",
                 subject="Tenant A - T4",
                 body="Body",
-                priority="normal",
             )
             # Ticket 5 (no priority -> default policy: 60m/240m): created 300m ago, no response, no resolution -> overdue
-            t5 = ticket_repo.create_or_get_ticket(
+            t5, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a5@test.com",
                 subject="Tenant A - T5",
                 body="Body",
-                priority=None,
             )
             # Ticket 6 (urgent): created 50m ago, but has invalid timestamp (first_response_at before created_at)
-            t6 = ticket_repo.create_or_get_ticket(
+            t6, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
                 customer_email="a6@test.com",
                 subject="Tenant A - T6 (Data Quality Issue)",
                 body="Body",
-                priority="urgent",
             )
 
             # Insert Tenant B Tickets:
-            tb1 = ticket_repo.create_or_get_ticket(
+            tb1, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_b,
                 customer_email="b1@test.com",
                 subject="Tenant B - T1",
                 body="Body",
-                priority="default",
             )
-            tb2 = ticket_repo.create_or_get_ticket(
+            tb2, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_b,
                 customer_email="b2@test.com",
                 subject="Tenant B - T2",
                 body="Body",
-                priority="low",
             )
 
-            # Adjust timestamps deterministically using raw update for test fixture control
+            # Explicit test fixture state setup: establish required priority, status, and timestamps.
+            # Strictly scoped by both tenant_id AND id to maintain multi-tenant isolation.
             with conn.cursor() as cur:
-                # T1: created 20m ago (15:40)
-                cur.execute(
-                    "UPDATE tickets SET created_at = %s, status = 'open' WHERE id = %s",
-                    (now - timedelta(minutes=20), t1.id),
-                )
-                # T2: created 30m ago (15:30) -> due at 16:00 (exact deadline)
-                cur.execute(
-                    "UPDATE tickets SET created_at = %s, status = 'open' WHERE id = %s",
-                    (now - timedelta(minutes=30), t2.id),
-                )
-                # T3: created 40m ago (15:20), response at 15:40 (+20m), resolved at 17:50 (late, closed)
+                # T1: created 20m ago (15:40), priority = 'urgent'
                 cur.execute(
                     """
                     UPDATE tickets
-                    SET created_at = %s,
+                    SET priority = 'urgent', created_at = %s, status = 'open'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (now - timedelta(minutes=20), tenant_a, t1.id),
+                )
+                # T2: created 30m ago (15:30) -> due at 16:00 (exact deadline), priority = 'urgent'
+                cur.execute(
+                    """
+                    UPDATE tickets
+                    SET priority = 'urgent', created_at = %s, status = 'open'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (now - timedelta(minutes=30), tenant_a, t2.id),
+                )
+                # T3: created 40m ago (15:20), response at 15:40 (+20m), resolved at 17:50 (late, closed), priority = 'urgent'
+                cur.execute(
+                    """
+                    UPDATE tickets
+                    SET priority = 'urgent',
+                        created_at = %s,
                         first_response_at = %s,
                         resolved_at = %s,
                         status = 'closed'
-                    WHERE id = %s
+                    WHERE tenant_id = %s AND id = %s;
                     """,
                     (
                         now - timedelta(minutes=40),
                         now - timedelta(minutes=20),
                         now + timedelta(minutes=110),
+                        tenant_a,
                         t3.id,
                     ),
                 )
-                # T4: created 80m ago (14:40), response at 16:10 (+90m, late), status = 'open'
+                # T4: created 80m ago (14:40), response at 16:10 (+90m, late), status = 'open', priority = 'normal'
                 cur.execute(
                     """
                     UPDATE tickets
-                    SET created_at = %s,
+                    SET priority = 'normal',
+                        created_at = %s,
                         first_response_at = %s,
                         status = 'open'
-                    WHERE id = %s
+                    WHERE tenant_id = %s AND id = %s;
                     """,
                     (
                         now - timedelta(minutes=80),
                         now + timedelta(minutes=10),
+                        tenant_a,
                         t4.id,
                     ),
                 )
-                # T5: created 300m ago (11:00), status = 'pending'
-                cur.execute(
-                    "UPDATE tickets SET created_at = %s, status = 'pending' WHERE id = %s",
-                    (now - timedelta(minutes=300), t5.id),
-                )
-                # T6: created 50m ago, first_response_at 60m ago (before created_at -> invalid timestamp DQ issue)
+                # T5: created 300m ago (11:00), status = 'pending', priority = NULL (falls back to default policy)
                 cur.execute(
                     """
                     UPDATE tickets
-                    SET created_at = %s,
+                    SET priority = NULL,
+                        created_at = %s,
+                        status = 'pending'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (now - timedelta(minutes=300), tenant_a, t5.id),
+                )
+                # T6: created 50m ago, first_response_at 60m ago (before created_at -> invalid timestamp DQ issue), priority = 'urgent'
+                cur.execute(
+                    """
+                    UPDATE tickets
+                    SET priority = 'urgent',
+                        created_at = %s,
                         first_response_at = %s,
                         status = 'open'
-                    WHERE id = %s
+                    WHERE tenant_id = %s AND id = %s;
                     """,
                     (
                         now - timedelta(minutes=50),
                         now - timedelta(minutes=60),
+                        tenant_a,
                         t6.id,
                     ),
                 )
 
-                # Tenant B timestamps
+                # Tenant B timestamps:
+                # TB1: created 10m ago, status = 'new', priority = NULL (falls back to Tenant B default policy)
                 cur.execute(
-                    "UPDATE tickets SET created_at = %s, status = 'new' WHERE id = %s",
-                    (now - timedelta(minutes=10), tb1.id),
+                    """
+                    UPDATE tickets
+                    SET priority = NULL,
+                        created_at = %s,
+                        status = 'new'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (now - timedelta(minutes=10), tenant_b, tb1.id),
                 )
+                # TB2: created 50m ago, status = 'open', priority = 'low' (falls back to Tenant B default policy)
                 cur.execute(
-                    "UPDATE tickets SET created_at = %s, status = 'open' WHERE id = %s",
-                    (now - timedelta(minutes=50), tb2.id),
+                    """
+                    UPDATE tickets
+                    SET priority = 'low',
+                        created_at = %s,
+                        status = 'open'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (now - timedelta(minutes=50), tenant_b, tb2.id),
                 )
 
         # Execute dashboard aggregation for Tenant A
