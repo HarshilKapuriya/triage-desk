@@ -35,6 +35,7 @@ from app.repositories.auth import get_user_by_email
 import app.repositories.duplicates as dup_repo
 import app.repositories.kb as kb_repo
 import app.repositories.sla as sla_repo
+import app.repositories.ticket_events as ticket_events_repo
 import app.repositories.dashboard as dashboard_repo
 from app.ml.chunking import chunk_article_text, ChunkingError
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
@@ -1350,6 +1351,22 @@ async def record_first_response_endpoint(
                         (now, principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    created_at = current.get("created_at")
+                    elapsed = (now - created_at).total_seconds() if created_at else None
+                    payload_ev = ticket_events_repo.build_first_response_payload(
+                        responded_at=now,
+                        elapsed_calendar_seconds=elapsed,
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="first_response_recorded",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,
@@ -1436,6 +1453,24 @@ async def resolve_ticket_endpoint(
                         (now, principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    created_at = current.get("created_at")
+                    elapsed = (now - created_at).total_seconds() if created_at else None
+                    payload_ev = ticket_events_repo.build_ticket_resolved_payload(
+                        resolved_at=now,
+                        from_status=current["status"],
+                        to_status="resolved",
+                        elapsed_calendar_seconds=elapsed,
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="ticket_resolved",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,
@@ -1524,6 +1559,21 @@ async def close_ticket_endpoint(
                         (principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    payload_ev = ticket_events_repo.build_ticket_closed_payload(
+                        closed_at=now,
+                        from_status=current["status"],
+                        to_status="closed",
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="ticket_closed",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,
