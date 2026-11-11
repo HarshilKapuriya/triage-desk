@@ -44,7 +44,13 @@ from app.repositories import (
     jobs as job_repo,
     sla as sla_repo,
 )
-from app.security import hash_password, generate_api_key
+from app.security import (
+    hash_password,
+    generate_api_key,
+    create_access_token,
+    derive_session_identifier,
+    generate_csrf_token,
+)
 from tests.target_validator import (
     validate_isolated_target,
     TargetSafetyError,
@@ -97,6 +103,7 @@ def db_pool() -> Generator[ConnectionPool | None, None, None]:
     try:
         yield pool
     finally:
+        app.dependency_overrides.clear()
         app.router.lifespan_context = original_lifespan
         pool.close()
         app_db.set_pool(None)
@@ -108,10 +115,10 @@ def conn(db_pool: ConnectionPool | None) -> Generator[psycopg.Connection[Any], N
     if db_pool is None:
         raise RuntimeError("Disposable test database pool is not initialized.")
     with db_pool.connection() as connection:
-        yield connection
-    """Dedicated connection per test function."""
-    with db_pool.connection() as connection:
-        yield connection
+        try:
+            yield connection
+        finally:
+            app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -334,47 +341,61 @@ def test_05_sequential_and_concurrent_duplicate_lifecycle_requests(
         with conn.cursor() as cur:
             cur.execute("UPDATE tickets SET status = 'open' WHERE id = %s;", (ticket.id,))
 
-    principal = Principal(tenant_id=tenant_id, kind="user", id=user_id, role="agent")
-    app.dependency_overrides[get_browser_principal_json] = lambda: principal
-    client = TestClient(app)
+    session_token = create_access_token(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        role="agent",
+        expires_delta=timedelta(minutes=60),
+    )
+    session_id = derive_session_identifier(session_token)
+    csrf_token = generate_csrf_token(session_id)
+    cookies = {"triage_session": session_token}
+    headers = {"X-CSRF-Token": csrf_token}
 
-    try:
-        # Sequential calls
-        res1 = client.post(f"/browser-api/tickets/{ticket.id}/first-response")
-        assert res1.status_code == 200
-        assert res1.json()["ok"] is True
+    client = TestClient(app, cookies=cookies)
 
-        res2 = client.post(f"/browser-api/tickets/{ticket.id}/first-response")
-        assert res2.status_code == 200
-        assert res2.json()["ok"] is True
+    # Sequential calls
+    res1 = client.post(f"/browser-api/tickets/{ticket.id}/first-response", headers=headers)
+    assert res1.status_code == 200
+    assert res1.json()["ok"] is True
 
-        events = ticket_events_repo.list_ticket_events(conn, tenant_id, ticket.id)
-        fr_events = [e for e in events if e.event_type == "first_response_recorded"]
-        assert len(fr_events) == 1, "Sequential duplicate calls must result in exactly 1 first-response event."
+    res2 = client.post(f"/browser-api/tickets/{ticket.id}/first-response", headers=headers)
+    assert res2.status_code == 200
+    assert res2.json()["ok"] is True
 
-        # Concurrent calls on a fresh ticket
-        t2, _ = ticket_repo.create_or_get_ticket(conn, tenant_id, "Concurrent 2", "Body 2")
-        with conn.transaction():
-            with conn.cursor() as cur:
-                cur.execute("UPDATE tickets SET status = 'open' WHERE id = %s;", (t2.id,))
+    t1_after = ticket_repo.get_ticket_by_id(conn, tenant_id, ticket.id)
+    assert t1_after is not None
+    assert t1_after.first_response_at is not None
 
-        def post_fr():
-            c = TestClient(app)
-            return c.post(f"/browser-api/tickets/{t2.id}/first-response")
+    events = ticket_events_repo.list_ticket_events(conn, tenant_id, ticket.id)
+    fr_events = [e for e in events if e.event_type == "first_response_recorded"]
+    assert len(fr_events) == 1, "Sequential duplicate calls must result in exactly 1 first-response event."
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            fut1 = executor.submit(post_fr)
-            fut2 = executor.submit(post_fr)
-            r1, r2 = fut1.result(), fut2.result()
+    # Concurrent calls on a fresh ticket
+    t2, _ = ticket_repo.create_or_get_ticket(conn, tenant_id, "Concurrent 2", "Body 2")
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("UPDATE tickets SET status = 'open' WHERE id = %s;", (t2.id,))
 
-        assert r1.status_code == 200
-        assert r2.status_code == 200
+    def post_fr():
+        c = TestClient(app, cookies=cookies)
+        return c.post(f"/browser-api/tickets/{t2.id}/first-response", headers=headers)
 
-        events2 = ticket_events_repo.list_ticket_events(conn, tenant_id, t2.id)
-        fr_events2 = [e for e in events2 if e.event_type == "first_response_recorded"]
-        assert len(fr_events2) == 1, "Concurrent duplicate calls must result in exactly 1 first-response event."
-    finally:
-        app.dependency_overrides.clear()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        fut1 = executor.submit(post_fr)
+        fut2 = executor.submit(post_fr)
+        r1, r2 = fut1.result(timeout=10), fut2.result(timeout=10)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    t2_after = ticket_repo.get_ticket_by_id(conn, tenant_id, t2.id)
+    assert t2_after is not None
+    assert t2_after.first_response_at is not None
+
+    events2 = ticket_events_repo.list_ticket_events(conn, tenant_id, t2.id)
+    fr_events2 = [e for e in events2 if e.event_type == "first_response_recorded"]
+    assert len(fr_events2) == 1, "Concurrent duplicate calls must result in exactly 1 first-response event."
 
 
 # 6. Creation Deduplication via external_id and Event Atomicity
@@ -433,14 +454,20 @@ def test_07_browser_and_repository_lifecycle_parity(
     assert rec_repo.status == "resolved"
 
     # Path B: Browser endpoint resolve
-    principal = Principal(tenant_id=tenant_id, kind="user", id=user_id, role="agent")
-    app.dependency_overrides[get_browser_principal_json] = lambda: principal
-    client = TestClient(app)
-    try:
-        res = client.post(f"/browser-api/tickets/{t_browser.id}/resolve")
-        assert res.status_code == 200
-    finally:
-        app.dependency_overrides.clear()
+    session_token = create_access_token(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        role="agent",
+        expires_delta=timedelta(minutes=60),
+    )
+    session_id = derive_session_identifier(session_token)
+    csrf_token = generate_csrf_token(session_id)
+    cookies = {"triage_session": session_token}
+    headers = {"X-CSRF-Token": csrf_token}
+
+    client = TestClient(app, cookies=cookies)
+    res = client.post(f"/browser-api/tickets/{t_browser.id}/resolve", headers=headers)
+    assert res.status_code == 200
 
     # Compare event payloads
     events_repo = ticket_events_repo.list_ticket_events(conn, tenant_id, t_repo.id)
@@ -467,19 +494,19 @@ def test_08_worker_completion_atomicity_and_retry(
 
     # Enqueue job
     with conn.transaction():
-        job_id = job_repo.enqueue_job(conn, tenant_id, ticket.id, "ticket_ingest")
+        enqueued_job = job_repo.enqueue_job(conn, tenant_id, ticket.id, "ticket_ingest")
 
     # Claim job
-    claim = job_repo.claim_next_job(conn, worker_id="worker-test", lease_seconds=60)
+    claim = job_repo.claim_next_job(conn, worker_id="worker-test", lease_seconds=60, tenant_id=tenant_id)
     assert claim is not None
-    assert claim.id == job_id
+    assert claim.id == enqueued_job.id
 
     # 1. First completion -> transitions ticket to open and emits ticket_processed
     with conn.transaction():
         ok = job_repo.complete_job_with_ticket_transition(
             conn=conn,
             tenant_id=tenant_id,
-            job_id=job_id,
+            job_id=enqueued_job.id,
             ticket_id=ticket.id,
             worker_id="worker-test",
             generation=claim.attempts,
@@ -488,6 +515,7 @@ def test_08_worker_completion_atomicity_and_retry(
         assert ok is True
 
     t_after = ticket_repo.get_ticket_by_id(conn, tenant_id, ticket.id)
+    assert t_after is not None
     assert t_after.status == "open"
 
     events = ticket_events_repo.list_ticket_events(conn, tenant_id, ticket.id)
@@ -500,11 +528,14 @@ def test_08_worker_completion_atomicity_and_retry(
     # 2. Simulated retry of already progressed ticket -> skips event
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("UPDATE jobs SET status = 'running', locked_by = 'worker-test' WHERE id = %s;", (job_id,))
+            cur.execute(
+                "UPDATE jobs SET status = 'running', locked_by = 'worker-test', locked_at = NOW() WHERE id = %s;",
+                (enqueued_job.id,),
+            )
         ok_retry = job_repo.complete_job_with_ticket_transition(
             conn=conn,
             tenant_id=tenant_id,
-            job_id=job_id,
+            job_id=enqueued_job.id,
             ticket_id=ticket.id,
             worker_id="worker-test",
             generation=claim.attempts,
