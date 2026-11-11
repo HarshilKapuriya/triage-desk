@@ -124,7 +124,7 @@ def test_dashboard_sql_aggregation_and_two_tenant_isolation():
                 subject="Tenant A - T3",
                 body="Body",
             )
-            # Ticket 4 (normal -> default policy: 60m/240m): created 80m ago, response at +90m (late), incomplete resolution
+            # Ticket 4 (normal -> default policy: 60m/240m): created 80m ago, response at +70m (late), incomplete resolution
             t4, _ = ticket_repo.create_or_get_ticket(
                 conn=conn,
                 tenant_id=tenant_a,
@@ -205,7 +205,7 @@ def test_dashboard_sql_aggregation_and_two_tenant_isolation():
                         t3.id,
                     ),
                 )
-                # T4: created 80m ago (14:40), response at 16:10 (+90m, late), status = 'open', priority = 'normal'
+                # T4: created 80m ago (14:40), response at 15:50 (+70m, late), status = 'open', priority = 'normal'
                 cur.execute(
                     """
                     UPDATE tickets
@@ -217,7 +217,7 @@ def test_dashboard_sql_aggregation_and_two_tenant_isolation():
                     """,
                     (
                         now - timedelta(minutes=80),
-                        now + timedelta(minutes=10),
+                        now - timedelta(minutes=10),
                         tenant_a,
                         t4.id,
                     ),
@@ -339,8 +339,8 @@ def test_dashboard_sql_aggregation_and_two_tenant_isolation():
         ev_t3 = evaluate_target("first_response", 30, now - timedelta(minutes=40), now - timedelta(minutes=20), now)
         assert not ev_t3.is_breached and ev_t3.timeliness == "on_time"
 
-        # T4 (default 60m, created 80m ago, response at +90m): breached late
-        ev_t4 = evaluate_target("first_response", 60, now - timedelta(minutes=80), now + timedelta(minutes=10), now + timedelta(minutes=15))
+        # T4 (default 60m, created 80m ago, response at +70m): breached late
+        ev_t4 = evaluate_target("first_response", 60, now - timedelta(minutes=80), now - timedelta(minutes=10), now)
         assert ev_t4.is_breached and ev_t4.timeliness == "late"
 
         # T5 (default 60m, created 300m ago, no response): overdue
