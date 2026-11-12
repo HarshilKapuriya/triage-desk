@@ -15,9 +15,10 @@ Covers:
 11. Cache-Control: no-store header on all browser API responses.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from pathlib import Path
 import re
 import uuid
 import pytest
@@ -28,6 +29,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+import app.main as app_main
 from app.main import app
 import app.db as app_db
 from app.repositories.auth import create_tenant_and_admin_user
@@ -451,29 +453,115 @@ def test_api_v1_rejects_browser_session_cookie(client: TestClient):
 # 10. SPA Routing Exclusions
 # ===========================================================================
 
-@skip_no_test_db
-def test_spa_routing_exclusions(client: TestClient):
-    """Unknown API routes return 404 JSON, never SPA HTML; UI routes return index.html."""
-    r_unknown_api = client.get("/browser-api/unknown-endpoint")
+@asynccontextmanager
+async def _spa_noop_lifespan(test_app: FastAPI) -> AsyncIterator[None]:
+    """No-op lifespan isolating pure SPA routing checks from DB pool initialization."""
+    yield
+
+
+@pytest.fixture
+def spa_client() -> Iterator[TestClient]:
+    """TestClient with no-op lifespan scoped strictly to pure SPA routing tests."""
+    orig_lifespan = app.router.lifespan_context
+    app.router.lifespan_context = _spa_noop_lifespan
+    try:
+        with TestClient(app, follow_redirects=False) as c:
+            yield c
+    finally:
+        app.router.lifespan_context = orig_lifespan
+
+
+def test_spa_routing_exclusions(
+    spa_client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Unknown API/asset routes never serve SPA HTML; reserved and UI routes resolve cleanly."""
+    synthetic_marker = f"synthetic-spa-routing-fixture-{uuid.uuid4().hex}"
+    synthetic_dist = tmp_path / "dist"
+    synthetic_dist.mkdir()
+    (synthetic_dist / "index.html").write_text(
+        f'<!DOCTYPE html><html><body data-spa-fixture="{synthetic_marker}"><div id="root"></div></body></html>',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(app_main, "FRONTEND_DIST", synthetic_dist)
+
+    r_unknown_api = spa_client.get("/browser-api/unknown-endpoint")
     assert r_unknown_api.status_code == 404
     assert r_unknown_api.json()["error"]["code"] == "http_404"
+    assert synthetic_marker not in r_unknown_api.text
 
-    r_unknown_v1 = client.get("/v1/unknown-endpoint")
+    r_unknown_v1 = spa_client.get("/v1/unknown-endpoint")
     assert r_unknown_v1.status_code == 404
     assert r_unknown_v1.json()["error"]["code"] == "http_404"
+    assert synthetic_marker not in r_unknown_v1.text
 
-    # UI routes return index.html
-    r_root = client.get("/")
+    r_missing_asset = spa_client.get("/assets/nonexistent-bundle-asset.js")
+    assert r_missing_asset.status_code == 404
+    assert synthetic_marker not in r_missing_asset.text
+    assert '<div id="root"></div>' not in r_missing_asset.text
+
+    r_health = spa_client.get("/healthz")
+    assert r_health.status_code == 200
+    assert r_health.json() == {"status": "ok"}
+    assert synthetic_marker not in r_health.text
+
+    r_docs = spa_client.get("/docs")
+    assert r_docs.status_code == 200
+    assert synthetic_marker not in r_docs.text
+
+    r_openapi = spa_client.get("/openapi.json")
+    assert r_openapi.status_code == 200
+    assert synthetic_marker not in r_openapi.text
+
+    # UI routes return the synthetic index.html via serve_spa
+    r_root = spa_client.get("/")
     assert r_root.status_code == 200
     assert '<div id="root"></div>' in r_root.text
+    assert synthetic_marker in r_root.text
 
-    r_tickets = client.get("/tickets")
+    r_tickets = spa_client.get("/tickets")
     assert r_tickets.status_code == 200
     assert '<div id="root"></div>' in r_tickets.text
+    assert synthetic_marker in r_tickets.text
 
-    r_detail = client.get(f"/tickets/{uuid.uuid4()}")
+    r_detail = spa_client.get(f"/tickets/{uuid.uuid4()}")
     assert r_detail.status_code == 200
     assert '<div id="root"></div>' in r_detail.text
+    assert synthetic_marker in r_detail.text
+
+
+def test_spa_missing_assets_returns_404(
+    spa_client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """When compiled SPA index.html is absent, UI fallback returns 404 JSON while /healthz works."""
+    empty_dist = tmp_path / "empty_dist"
+    empty_dist.mkdir()
+    monkeypatch.setattr(app_main, "FRONTEND_DIST", empty_dist)
+
+    r_root = spa_client.get("/")
+    assert r_root.status_code == 404
+    assert r_root.json() == {
+        "error": {"code": "http_404", "message": "Frontend assets not built."}
+    }
+
+    r_tickets = spa_client.get("/tickets")
+    assert r_tickets.status_code == 404
+    assert r_tickets.json() == {
+        "error": {"code": "http_404", "message": "Frontend assets not built."}
+    }
+
+    r_unknown_api = spa_client.get("/browser-api/unknown-endpoint")
+    assert r_unknown_api.status_code == 404
+    assert r_unknown_api.json() == {
+        "error": {"code": "http_404", "message": "Not Found"}
+    }
+
+    r_health = spa_client.get("/healthz")
+    assert r_health.status_code == 200
+    assert r_health.json() == {"status": "ok"}
 
 
 # ===========================================================================

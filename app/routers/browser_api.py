@@ -9,6 +9,7 @@ Preserves:
 """
 
 from datetime import datetime, timezone
+import math
 import secrets
 from typing import Any
 import uuid
@@ -35,6 +36,7 @@ from app.repositories.auth import get_user_by_email
 import app.repositories.duplicates as dup_repo
 import app.repositories.kb as kb_repo
 import app.repositories.sla as sla_repo
+import app.repositories.ticket_events as ticket_events_repo
 import app.repositories.dashboard as dashboard_repo
 from app.ml.chunking import chunk_article_text, ChunkingError
 from app.repositories.jobs import enqueue_job, get_job_by_ticket_id
@@ -1281,6 +1283,304 @@ def get_ticket_sla_endpoint(
     }
 
 
+_EVENT_LABELS: dict[str, str] = {
+    "ticket_created": "Ticket created",
+    "ticket_processed": "Processing completed",
+    "first_response_recorded": "First response recorded",
+    "ticket_resolved": "Ticket resolved",
+    "ticket_closed": "Ticket closed",
+}
+
+_EVENT_ORDERING_SPEC = "occurred_at ASC, recorded_at ASC, id ASC"
+_EVENT_ORDERING_NOTICE = (
+    "Ordered by occurred_at ASC, recorded_at ASC, id ASC (stable event-time ordering, "
+    "not guaranteed causal or commit visibility ordering)."
+)
+
+
+class IntakePolicySummary(BaseModel):
+    """Explicit allowlisted SLA policy snapshot recorded at ticket intake."""
+
+    is_configured: bool
+    policy_priority: str | None = None
+    first_response_minutes: int | None = None
+    resolution_minutes: int | None = None
+
+
+class TicketEventDetails(BaseModel):
+    """Explicitly allowlisted event metadata for schema_version == 1."""
+
+    intake_policy: IntakePolicySummary | None = None
+    priority: str | None = None
+    category: str | None = None
+    from_status: str | None = None
+    to_status: str | None = None
+    predicted_category: str | None = None
+    elapsed_calendar_seconds: float | None = None
+
+
+class TicketEventItem(BaseModel):
+    """Typed, allowlisted browser view of a single ticket lifecycle event."""
+
+    id: str
+    event_type: str
+    label: str
+    schema_version: int
+    schema_supported: bool
+    payload_valid: bool
+    occurred_at: str
+    recorded_at: str
+    actor_type: str
+    details: TicketEventDetails | None = None
+
+
+class TicketEventsResponse(BaseModel):
+    """Tenant-scoped lifecycle timeline response."""
+
+    ticket_id: str
+    schema_available: bool
+    ordering: str
+    ordering_notice: str
+    events: list[TicketEventItem]
+    message: str | None = None
+
+
+def _safe_short_str(value: Any, max_len: int = 200) -> str | None:
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned and len(cleaned) <= max_len:
+            return cleaned
+    return None
+
+
+def _safe_positive_int(value: Any) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
+
+def _safe_non_negative_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        fval = float(value)
+        if math.isfinite(fval) and fval >= 0.0:
+            return round(fval, 2)
+    return None
+
+
+def _malformed_supported_event(record: ticket_events_repo.TicketEventRecord, label: str) -> TicketEventItem:
+    return TicketEventItem(
+        id=str(record.id),
+        event_type=record.event_type,
+        label=label,
+        schema_version=record.schema_version,
+        schema_supported=True,
+        payload_valid=False,
+        occurred_at=record.occurred_at.isoformat(),
+        recorded_at=record.recorded_at.isoformat(),
+        actor_type=record.actor_type,
+        details=None,
+    )
+
+
+def _is_valid_optional_short_str(value: Any) -> bool:
+    return value is None or _safe_short_str(value) is not None
+
+
+def _is_valid_iso_str(value: Any) -> bool:
+    s = _safe_short_str(value, max_len=64)
+    if s is None:
+        return False
+    try:
+        datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
+
+
+def _serialize_ticket_event(record: ticket_events_repo.TicketEventRecord) -> TicketEventItem:
+    """Project a TicketEventRecord onto the strict allowlisted browser response schema."""
+    label = _EVENT_LABELS.get(record.event_type, "Lifecycle event")
+    payload = record.payload if isinstance(record.payload, dict) else None
+
+    if record.schema_version != 1 or record.event_type not in _EVENT_LABELS:
+        return TicketEventItem(
+            id=str(record.id),
+            event_type=record.event_type,
+            label=label,
+            schema_version=record.schema_version,
+            schema_supported=False,
+            payload_valid=False,
+            occurred_at=record.occurred_at.isoformat(),
+            recorded_at=record.recorded_at.isoformat(),
+            actor_type=record.actor_type,
+            details=None,
+        )
+
+    if payload is None:
+        return _malformed_supported_event(record, label)
+
+    if "schema_version" in payload:
+        payload_sv = payload["schema_version"]
+        if isinstance(payload_sv, bool) or payload_sv != 1:
+            return _malformed_supported_event(record, label)
+
+    if record.event_type == "ticket_created":
+        raw_snap = payload.get("policy_snapshot")
+        if not isinstance(raw_snap, dict):
+            return _malformed_supported_event(record, label)
+        raw_is_conf = raw_snap.get("is_configured")
+        if not isinstance(raw_is_conf, bool):
+            return _malformed_supported_event(record, label)
+        if not _is_valid_optional_short_str(payload.get("priority")) or not _is_valid_optional_short_str(
+            payload.get("category")
+        ):
+            return _malformed_supported_event(record, label)
+
+        if raw_is_conf:
+            fr_min = _safe_positive_int(raw_snap.get("first_response_minutes"))
+            res_min = _safe_positive_int(raw_snap.get("resolution_minutes"))
+            if fr_min is None or res_min is None or not _is_valid_optional_short_str(raw_snap.get("policy_priority")):
+                return _malformed_supported_event(record, label)
+            intake_policy = IntakePolicySummary(
+                is_configured=True,
+                policy_priority=_safe_short_str(raw_snap.get("policy_priority")),
+                first_response_minutes=fr_min,
+                resolution_minutes=res_min,
+            )
+        else:
+            intake_policy = IntakePolicySummary(is_configured=False)
+
+        details = TicketEventDetails(
+            intake_policy=intake_policy,
+            priority=_safe_short_str(payload.get("priority")),
+            category=_safe_short_str(payload.get("category")),
+        )
+    elif record.event_type == "ticket_processed":
+        from_status = _safe_short_str(payload.get("from_status"))
+        to_status = _safe_short_str(payload.get("to_status"))
+        if from_status is None or to_status is None or not _is_valid_optional_short_str(payload.get("predicted_category")):
+            return _malformed_supported_event(record, label)
+        details = TicketEventDetails(
+            from_status=from_status,
+            to_status=to_status,
+            predicted_category=_safe_short_str(payload.get("predicted_category")),
+        )
+    elif record.event_type == "first_response_recorded":
+        if not _is_valid_iso_str(payload.get("responded_at")):
+            return _malformed_supported_event(record, label)
+        raw_elapsed = payload.get("elapsed_calendar_seconds")
+        elapsed = _safe_non_negative_float(raw_elapsed) if raw_elapsed is not None else None
+        if raw_elapsed is not None and elapsed is None:
+            return _malformed_supported_event(record, label)
+        details = TicketEventDetails(
+            elapsed_calendar_seconds=elapsed,
+        )
+    elif record.event_type == "ticket_resolved":
+        from_status = _safe_short_str(payload.get("from_status"))
+        to_status = _safe_short_str(payload.get("to_status"))
+        if from_status is None or to_status is None:
+            return _malformed_supported_event(record, label)
+        if "resolved_at" in payload and payload["resolved_at"] is not None and not _is_valid_iso_str(payload["resolved_at"]):
+            return _malformed_supported_event(record, label)
+        raw_elapsed = payload.get("elapsed_calendar_seconds")
+        elapsed = _safe_non_negative_float(raw_elapsed) if raw_elapsed is not None else None
+        if raw_elapsed is not None and elapsed is None:
+            return _malformed_supported_event(record, label)
+        details = TicketEventDetails(
+            from_status=from_status,
+            to_status=to_status,
+            elapsed_calendar_seconds=elapsed,
+        )
+    else:  # ticket_closed
+        from_status = _safe_short_str(payload.get("from_status"))
+        to_status = _safe_short_str(payload.get("to_status"))
+        if from_status is None or to_status is None:
+            return _malformed_supported_event(record, label)
+        if "closed_at" in payload and payload["closed_at"] is not None and not _is_valid_iso_str(payload["closed_at"]):
+            return _malformed_supported_event(record, label)
+        details = TicketEventDetails(
+            from_status=from_status,
+            to_status=to_status,
+        )
+
+    return TicketEventItem(
+        id=str(record.id),
+        event_type=record.event_type,
+        label=label,
+        schema_version=record.schema_version,
+        schema_supported=True,
+        payload_valid=True,
+        occurred_at=record.occurred_at.isoformat(),
+        recorded_at=record.recorded_at.isoformat(),
+        actor_type=record.actor_type,
+        details=details,
+    )
+
+
+@router.get("/tickets/{ticket_id}/events", response_model=TicketEventsResponse)
+def get_ticket_events_json(
+    ticket_id: str,
+    request: Request,
+    response: Response,
+    principal: Principal = Depends(get_browser_principal_json),
+) -> TicketEventsResponse:
+    """Retrieve bounded, tenant-scoped lifecycle timeline events for a single ticket."""
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "Ticket not found."},
+        )
+
+    with get_connection() as conn:
+        ticket = get_ticket_by_id(conn, principal.tenant_id, ticket_uuid)
+        if not ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Ticket not found."},
+            )
+
+        try:
+            with conn.transaction():
+                records = ticket_events_repo.list_ticket_events(
+                    conn,
+                    principal.tenant_id,
+                    ticket_uuid,
+                    limit=ticket_events_repo.BOUNDED_EVENT_READ_LIMIT,
+                )
+            schema_available = True
+        except ticket_events_repo.TicketEventsSchemaUnavailableError:
+            records = []
+            schema_available = False
+        except psycopg.errors.UndefinedTable as exc:
+            if not ticket_events_repo._is_ticket_events_undefined(exc):
+                raise
+            records = []
+            schema_available = False
+
+    if not schema_available:
+        return TicketEventsResponse(
+            ticket_id=str(ticket_uuid),
+            schema_available=False,
+            ordering=_EVENT_ORDERING_SPEC,
+            ordering_notice=_EVENT_ORDERING_NOTICE,
+            events=[],
+            message="Lifecycle event history schema is not provisioned (migration 009 pending).",
+        )
+
+    return TicketEventsResponse(
+        ticket_id=str(ticket_uuid),
+        schema_available=True,
+        ordering=_EVENT_ORDERING_SPEC,
+        ordering_notice=_EVENT_ORDERING_NOTICE,
+        events=[_serialize_ticket_event(r) for r in records],
+        message=None,
+    )
+
+
 @router.post("/tickets/{ticket_id}/first-response")
 async def record_first_response_endpoint(
     ticket_id: str,
@@ -1350,6 +1650,22 @@ async def record_first_response_endpoint(
                         (now, principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    created_at = current.get("created_at")
+                    elapsed = (now - created_at).total_seconds() if created_at else None
+                    payload_ev = ticket_events_repo.build_first_response_payload(
+                        responded_at=now,
+                        elapsed_calendar_seconds=elapsed,
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="first_response_recorded",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,
@@ -1436,6 +1752,24 @@ async def resolve_ticket_endpoint(
                         (now, principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    created_at = current.get("created_at")
+                    elapsed = (now - created_at).total_seconds() if created_at else None
+                    payload_ev = ticket_events_repo.build_ticket_resolved_payload(
+                        resolved_at=now,
+                        from_status=current["status"],
+                        to_status="resolved",
+                        elapsed_calendar_seconds=elapsed,
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="ticket_resolved",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,
@@ -1524,6 +1858,21 @@ async def close_ticket_endpoint(
                         (principal.tenant_id, ticket_uuid),
                     )
                     updated = cur.fetchone()
+                    payload_ev = ticket_events_repo.build_ticket_closed_payload(
+                        closed_at=now,
+                        from_status=current["status"],
+                        to_status="closed",
+                    )
+                    ticket_events_repo.append_ticket_event(
+                        conn_or_cur=cur,
+                        tenant_id=principal.tenant_id,
+                        ticket_id=ticket_uuid,
+                        event_type="ticket_closed",
+                        occurred_at=now,
+                        actor_type="agent" if principal.kind == "user" else "system",
+                        actor_id=str(principal.id),
+                        payload=payload_ev,
+                    )
                     insert_audit_entry(
                         cur=cur,
                         tenant_id=principal.tenant_id,

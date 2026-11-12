@@ -6,7 +6,7 @@ Per SPEC.md Section 6:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from typing import Any
 import uuid
@@ -14,6 +14,7 @@ import psycopg
 from psycopg.rows import dict_row
 import app.repositories.duplicates as duplicates_repo
 import app.repositories.ml as ml_repo
+import app.repositories.ticket_events as ticket_events_repo
 
 
 
@@ -347,10 +348,27 @@ def complete_job_with_ticket_transition(
                 "UPDATE tickets SET status = 'open' WHERE tenant_id = %s AND id = %s AND status = 'new';",
                 (tenant_id, ticket_id),
             )
-            cur.execute(
-                "INSERT INTO audit_log (tenant_id, actor, action) VALUES (%s, %s, 'ticket.processed');",
-                (tenant_id, actor),
-            )
+            if cur.rowcount > 0:
+                cur.execute(
+                    "INSERT INTO audit_log (tenant_id, actor, action) VALUES (%s, %s, 'ticket.processed');",
+                    (tenant_id, actor),
+                )
+                payload = ticket_events_repo.build_ticket_processed_payload(
+                    from_status="new",
+                    to_status="open",
+                    predicted_category=predicted_label,
+                    model_version_id=str(model_version_id) if model_version_id else None,
+                )
+                ticket_events_repo.append_ticket_event(
+                    conn_or_cur=cur,
+                    tenant_id=tenant_id,
+                    ticket_id=ticket_id,
+                    event_type="ticket_processed",
+                    occurred_at=datetime.now(timezone.utc),
+                    actor_type="worker",
+                    actor_id=worker_id,
+                    payload=payload,
+                )
         else:
             # Leave ticket status unchanged, record skipped audit log
             cur.execute(

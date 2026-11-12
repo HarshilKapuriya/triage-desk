@@ -9,11 +9,14 @@ Per SPEC.md Section 5, 6, and 7:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 import uuid
 import psycopg
 from psycopg.rows import dict_row
+
+import app.repositories.sla as sla_repo
+import app.repositories.ticket_events as ticket_events_repo
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,61 @@ def _row_to_ticket(row: dict[str, Any]) -> TicketRecord:
     )
 
 
+def _emit_ticket_created_event(
+    cur: psycopg.Cursor[Any],
+    conn: psycopg.Connection[Any],
+    tenant_id: uuid.UUID,
+    ticket: TicketRecord,
+    actor_type: str,
+    actor_id: str | None,
+) -> None:
+    """Emit a ticket_created lifecycle event with effective SLA policy snapshot."""
+    policy_snapshot = None
+    try:
+        policy = sla_repo.resolve_effective_policy(conn, tenant_id, ticket.priority)
+        if policy is not None:
+            policy_snapshot = {
+                "is_configured": True,
+                "policy_id": str(policy.id),
+                "policy_priority": policy.priority,
+                "first_response_minutes": policy.first_response_minutes,
+                "resolution_minutes": policy.resolution_minutes,
+            }
+        else:
+            policy_snapshot = {
+                "is_configured": False,
+                "policy_id": None,
+                "policy_priority": None,
+                "first_response_minutes": None,
+                "resolution_minutes": None,
+            }
+    except Exception:
+        # Handles unapplied SLA schema or connection lookup issues gracefully
+        policy_snapshot = {
+            "is_configured": False,
+            "policy_id": None,
+            "policy_priority": None,
+            "first_response_minutes": None,
+            "resolution_minutes": None,
+        }
+
+    payload = ticket_events_repo.build_ticket_created_payload(
+        policy_snapshot=policy_snapshot,
+        priority=ticket.priority,
+        category=ticket.category,
+    )
+    ticket_events_repo.append_ticket_event(
+        conn_or_cur=cur,
+        tenant_id=tenant_id,
+        ticket_id=ticket.id,
+        event_type="ticket_created",
+        occurred_at=ticket.created_at,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        payload=payload,
+    )
+
+
 def create_or_get_ticket(
     conn: psycopg.Connection[Any],
     tenant_id: uuid.UUID,
@@ -87,6 +145,8 @@ def create_or_get_ticket(
     body: str,
     external_id: str | None = None,
     customer_email: str | None = None,
+    actor_type: str = "customer",
+    actor_id: str | None = None,
 ) -> tuple[TicketRecord, bool]:
     """Insert a new ticket or return existing ticket if external_id matches for this tenant.
 
@@ -111,7 +171,9 @@ def create_or_get_ticket(
             )
             created_row = cur.fetchone()
             if created_row:
-                return _row_to_ticket(created_row), True
+                ticket = _row_to_ticket(created_row)
+                _emit_ticket_created_event(cur, conn, tenant_id, ticket, actor_type, actor_id)
+                return ticket, True
 
             # If ON CONFLICT was triggered (ticket already exists), fetch existing ticket
             cur.execute(
@@ -137,7 +199,10 @@ def create_or_get_ticket(
             """,
             (tenant_id, subject, body, customer_email),
         )
-        return _row_to_ticket(cur.fetchone()), True
+        created_row = cur.fetchone()
+        ticket = _row_to_ticket(created_row)
+        _emit_ticket_created_event(cur, conn, tenant_id, ticket, actor_type, actor_id)
+        return ticket, True
 
 
 def list_tickets(
@@ -260,12 +325,14 @@ def record_first_response(
     tenant_id: uuid.UUID,
     ticket_id: uuid.UUID,
     responded_at: datetime,
+    actor_type: str = "agent",
+    actor_id: str | None = None,
 ) -> TicketRecord | None:
-    """Record first_response_at on a ticket, strictly scoped to tenant_id.
+    """Record first_response_at on a ticket and emit first_response_recorded event.
 
     Guarantees:
-    - Independent of ticket status (does not alter status).
-    - Preserves existing first_response_at on repeated calls (idempotent).
+    - Strictly scoped to tenant_id.
+    - Preserves existing first_response_at on repeated calls (idempotent, no duplicate event).
     - Rejects naive timestamps without timezone awareness.
     - Caller owns the transaction; does not call commit().
     - Returns updated TicketRecord or None if ticket not found.
@@ -311,7 +378,25 @@ def record_first_response(
             (responded_at, tenant_id, ticket_id),
         )
         row = cur.fetchone()
-        return _row_to_ticket(row) if row else None
+        ticket = _row_to_ticket(row) if row else None
+        if ticket and current.get("first_response_at") is None:
+            created_at = current.get("created_at")
+            elapsed = (responded_at - created_at).total_seconds() if created_at else None
+            payload = ticket_events_repo.build_first_response_payload(
+                responded_at=responded_at,
+                elapsed_calendar_seconds=elapsed,
+            )
+            ticket_events_repo.append_ticket_event(
+                conn_or_cur=cur,
+                tenant_id=tenant_id,
+                ticket_id=ticket_id,
+                event_type="first_response_recorded",
+                occurred_at=responded_at,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                payload=payload,
+            )
+        return ticket
 
 
 def resolve_ticket(
@@ -319,12 +404,14 @@ def resolve_ticket(
     tenant_id: uuid.UUID,
     ticket_id: uuid.UUID,
     resolved_at: datetime,
+    actor_type: str = "agent",
+    actor_id: str | None = None,
 ) -> TicketRecord | None:
-    """Transition ticket to 'resolved' and record resolved_at timestamp.
+    """Transition ticket to 'resolved', record resolved_at timestamp, and emit ticket_resolved event.
 
     Guarantees:
     - Strictly scoped to tenant_id.
-    - Preserves existing resolved_at timestamp on repeated calls if already resolved.
+    - Preserves existing resolved_at timestamp on repeated calls if already resolved (idempotent).
     - Raises InvalidStatusTransitionError if ticket is already 'closed' (no reopening).
     - Rejects naive timestamps without timezone awareness.
     - Rejects resolved_at preceding ticket created_at.
@@ -364,33 +451,59 @@ def resolve_ticket(
                 f"resolved_at ({resolved_at}) cannot precede ticket created_at ({created_at})."
             )
 
-        cur.execute(
-            """
-            UPDATE tickets
-            SET status = 'resolved',
-                resolved_at = COALESCE(resolved_at, %s)
-            WHERE tenant_id = %s AND id = %s
-            RETURNING id, tenant_id, external_id, subject, body, customer_email,
-                      status, category, priority, created_at,
-                      first_response_at, resolved_at, assignee_id;
-            """,
-            (resolved_at, tenant_id, ticket_id),
-        )
-        updated = cur.fetchone()
-        return _row_to_ticket(updated) if updated else None
+        if current_status != "resolved":
+            cur.execute(
+                """
+                UPDATE tickets
+                SET status = 'resolved',
+                    resolved_at = COALESCE(resolved_at, %s)
+                WHERE tenant_id = %s AND id = %s
+                RETURNING id, tenant_id, external_id, subject, body, customer_email,
+                          status, category, priority, created_at,
+                          first_response_at, resolved_at, assignee_id;
+                """,
+                (resolved_at, tenant_id, ticket_id),
+            )
+            updated = cur.fetchone()
+            ticket = _row_to_ticket(updated) if updated else None
+            if ticket:
+                elapsed = (resolved_at - created_at).total_seconds() if created_at else None
+                payload = ticket_events_repo.build_ticket_resolved_payload(
+                    resolved_at=resolved_at,
+                    from_status=current_status,
+                    to_status="resolved",
+                    elapsed_calendar_seconds=elapsed,
+                )
+                ticket_events_repo.append_ticket_event(
+                    conn_or_cur=cur,
+                    tenant_id=tenant_id,
+                    ticket_id=ticket_id,
+                    event_type="ticket_resolved",
+                    occurred_at=resolved_at,
+                    actor_type=actor_type,
+                    actor_id=actor_id,
+                    payload=payload,
+                )
+            return ticket
+        else:
+            return _row_to_ticket(current)
+
 
 def close_ticket(
     conn: psycopg.Connection[Any],
     tenant_id: uuid.UUID,
     ticket_id: uuid.UUID,
+    actor_type: str = "agent",
+    actor_id: str | None = None,
+    closed_at: datetime | None = None,
 ) -> TicketRecord | None:
-    """Transition ticket to 'closed', requiring prior resolution.
+    """Transition ticket to 'closed', requiring prior resolution, and emit ticket_closed event.
 
     Guarantees:
     - Strictly scoped to tenant_id.
     - Closing requires prior resolution ('resolved' status).
     - Raises InvalidStatusTransitionError if ticket is in 'new', 'open', or 'pending'.
-    - If already 'closed', operation is idempotent and returns the current record.
+    - If already 'closed', operation is idempotent and returns the current record (no duplicate event).
     - Does not alter or infer first_response_at or resolved_at.
     - Caller owns the transaction; does not call commit().
     - Returns updated TicketRecord or None if ticket not found.
@@ -421,6 +534,10 @@ def close_ticket(
                 f"Cannot close ticket {ticket_id}: ticket must be resolved first (current status: '{current_status}')."
             )
 
+        now = closed_at or datetime.now(timezone.utc)
+        if now.tzinfo is None or now.tzinfo.utcoffset(now) is None:
+            raise ValueError(f"closed_at must be timezone-aware (received naive datetime: {now})")
+
         cur.execute(
             """
             UPDATE tickets
@@ -433,5 +550,22 @@ def close_ticket(
             (tenant_id, ticket_id),
         )
         updated = cur.fetchone()
-        return _row_to_ticket(updated) if updated else None
+        ticket = _row_to_ticket(updated) if updated else None
+        if ticket:
+            payload = ticket_events_repo.build_ticket_closed_payload(
+                closed_at=now,
+                from_status=current_status,
+                to_status="closed",
+            )
+            ticket_events_repo.append_ticket_event(
+                conn_or_cur=cur,
+                tenant_id=tenant_id,
+                ticket_id=ticket_id,
+                event_type="ticket_closed",
+                occurred_at=now,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                payload=payload,
+            )
+        return ticket
 

@@ -66,11 +66,32 @@ header.top-nav {
   border-bottom: 1px solid var(--border-color);
   padding: 12px 24px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 12px 16px;
+  max-width: 100%;
+}
+header.top-nav > div {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+header.top-nav nav {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+header.top-nav button {
+  max-width: 100%;
+}
+header.top-nav button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .brand {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   cursor: pointer;
@@ -79,10 +100,14 @@ header.top-nav {
   padding: 0;
   color: inherit;
   font-family: inherit;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
 }
 .brand-mark {
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
   background-color: var(--primary);
   color: #ffffff;
   display: flex;
@@ -108,12 +133,19 @@ header.top-nav {
 }
 .nav-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 10px 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 .nav-user {
   font-size: 13px;
   color: var(--text-muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .nav-user code {
   font-family: var(--font-mono);
@@ -121,6 +153,11 @@ header.top-nav {
   background-color: var(--bg-subtle);
   padding: 2px 5px;
   border-radius: 3px;
+}
+.nav-user code,
+.nav-user strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .btn-logout {
   background: none;
@@ -137,6 +174,11 @@ header.top-nav {
   background-color: var(--bg-subtle);
   color: var(--text-main);
   border-color: var(--border-subtle);
+}
+@media (max-width: 640px) {
+  header.top-nav {
+    padding: 12px 16px;
+  }
 }
 
 /* Main Container */
@@ -879,5 +921,34 @@ footer.app-footer {
   font-size: 12px;
   color: var(--text-muted, #64748b);
   line-height: 1.4;
+}
+
+/* Ticket Detail Responsive Layout */
+.ticket-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.ticket-detail-main,
+.ticket-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ticket-detail-main > .card,
+.ticket-detail-sidebar > .card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 960px) {
+  .ticket-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
 }
 

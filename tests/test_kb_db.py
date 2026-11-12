@@ -205,7 +205,16 @@ def test_kb_db_article_jobs_failure_and_retry_backoff():
     with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
         with conn.transaction():
             art = kb_repo.create_kb_article(conn, tenant_id, "Retry Policy", "Body content")
-            job = kb_repo.enqueue_article_job(conn, tenant_id, art.id, "article_embedding", max_attempts=2)
+            job = kb_repo.enqueue_article_job(conn, tenant_id, art.id, "article_embedding")
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE article_jobs
+                    SET max_attempts = 2
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (tenant_id, job.id),
+                )
 
         # Claim attempt 1
         with conn.transaction():
@@ -234,8 +243,12 @@ def test_kb_db_article_jobs_failure_and_retry_backoff():
         with conn.transaction():
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE article_jobs SET run_after = NOW() - INTERVAL '10 seconds' WHERE id = %s;",
-                    (c1.id,),
+                    """
+                    UPDATE article_jobs
+                    SET run_after = NOW() - INTERVAL '10 seconds'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (tenant_id, c1.id),
                 )
 
         # Claim attempt 2
@@ -271,7 +284,7 @@ def test_kb_db_article_jobs_stale_lease_recovery():
     with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
         with conn.transaction():
             art = kb_repo.create_kb_article(conn, tenant_id, "Recovery Policy", "Body content")
-            job = kb_repo.enqueue_article_job(conn, tenant_id, art.id, "article_embedding", max_attempts=3)
+            job = kb_repo.enqueue_article_job(conn, tenant_id, art.id, "article_embedding")
 
         # Claim the job
         with conn.transaction():
@@ -282,8 +295,12 @@ def test_kb_db_article_jobs_stale_lease_recovery():
         with conn.transaction():
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE article_jobs SET locked_at = NOW() - INTERVAL '500 seconds' WHERE id = %s;",
-                    (claimed.id,),
+                    """
+                    UPDATE article_jobs
+                    SET locked_at = NOW() - INTERVAL '500 seconds'
+                    WHERE tenant_id = %s AND id = %s;
+                    """,
+                    (tenant_id, claimed.id),
                 )
 
         # Run recovery
@@ -294,7 +311,14 @@ def test_kb_db_article_jobs_stale_lease_recovery():
 
         # Job must be back in 'queued' state with cleared lock
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
-            cur.execute("SELECT status, locked_by, locked_at FROM article_jobs WHERE id = %s;", (claimed.id,))
+            cur.execute(
+                """
+                SELECT status, locked_by, locked_at
+                FROM article_jobs
+                WHERE tenant_id = %s AND id = %s;
+                """,
+                (tenant_id, claimed.id),
+            )
             row = cur.fetchone()
             assert row is not None
             assert row["status"] == "queued"
