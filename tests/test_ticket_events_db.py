@@ -831,9 +831,15 @@ def test_12_browser_events_legacy_empty_and_backdated_ordering(
     conn: psycopg.Connection[Any],
     synthetic_tenant: tuple[uuid.UUID, uuid.UUID],
 ) -> None:
-    """Legacy tickets return empty events; deliberately backdated occurred_at orders by occurred_at ASC, recorded_at ASC, id ASC."""
+    """Legacy tickets return empty events; synthetic event-read fixture verifies occurred_at ASC, recorded_at ASC, id ASC.
+
+    Note: Case B directly seeds a historical synthetic ticket and explicit event ordering keys
+    (occurred_at, recorded_at, id) to deterministically exercise event-read sorting and tie-breaking;
+    it is an event-read ordering fixture, not verification of the complete lifecycle-write path.
+    """
     tenant_id, user_id = synthetic_tenant
-    base_time = datetime.now(timezone.utc) - timedelta(hours=2)
+    historical_t0 = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=30)
+    recorded_base = historical_t0 + timedelta(days=15)
 
     # Case A: Legacy ticket with zero event rows
     legacy_id = uuid.uuid4()
@@ -844,51 +850,140 @@ def test_12_browser_events_legacy_empty_and_backdated_ordering(
                 INSERT INTO tickets (id, tenant_id, subject, body, status, created_at)
                 VALUES (%s, %s, 'Legacy No-Events Ticket', 'Body', 'open', %s);
                 """,
-                (legacy_id, tenant_id, base_time - timedelta(days=3)),
+                (legacy_id, tenant_id, historical_t0 - timedelta(days=3)),
             )
 
-    # Case B: Ticket with out-of-order insertion & backdated business occurred_at
-    t_ord, _ = ticket_repo.create_or_get_ticket(
-        conn=conn,
-        tenant_id=tenant_id,
-        subject="Ordering Ticket",
-        body="Body",
-    )
-    t_created_ev = ticket_events_repo.list_ticket_events(conn, tenant_id, t_ord.id)[0]
-    t0 = t_created_ev.occurred_at
+    # Case B: Synthetic event-read ordering fixture with historical business baseline & explicit tie-break keys.
+    # Deterministic UUID suffixes share a per-test unique 96-bit prefix so ordering does not rely on uuid4 luck.
+    ord_ticket_id = uuid.uuid4()
+    uid_prefix = uuid.uuid4().hex[:24]
+    uid_resolved = uuid.UUID(f"{uid_prefix}000000000001")
+    uid_closed = uuid.UUID(f"{uid_prefix}000000000002")
+    uid_first_resp = uuid.UUID(f"{uid_prefix}000000000003")
+    uid_processed = uuid.UUID(f"{uid_prefix}000000000004")
+    uid_created = uuid.UUID(f"{uid_prefix}000000000005")
 
-    # Insert first_response at t0 + 10m first (earlier recorded_at)
+    t_fr = historical_t0 + timedelta(minutes=10)
+    t_res = historical_t0 + timedelta(minutes=10)
+    t_cls = historical_t0 + timedelta(minutes=10)
+    t_proc_backdated = historical_t0 + timedelta(minutes=2)
+
+    fixture_rows_in_scrambled_insert_order = [
+        # 1. ticket_closed (+10m, rec +20m, uid ...0002): inserted before ticket_resolved (...0001) to prove id ASC beats insert order
+        (
+            uid_closed,
+            "ticket_closed",
+            t_cls,
+            recorded_base + timedelta(minutes=20),
+            "agent",
+            str(user_id),
+            json.dumps(ticket_events_repo.build_ticket_closed_payload(closed_at=t_cls)),
+        ),
+        # 2. first_response_recorded (+10m, rec +10m, uid ...0003): earlier recorded_at beats lower UUIDs (...0001, ...0002)
+        (
+            uid_first_resp,
+            "first_response_recorded",
+            t_fr,
+            recorded_base + timedelta(minutes=10),
+            "agent",
+            str(user_id),
+            json.dumps(
+                ticket_events_repo.build_first_response_payload(
+                    responded_at=t_fr,
+                    elapsed_calendar_seconds=(t_fr - historical_t0).total_seconds(),
+                )
+            ),
+        ),
+        # 3. ticket_resolved (+10m, rec +20m, uid ...0001): ties occurred_at and recorded_at with ticket_closed, wins on id ASC
+        (
+            uid_resolved,
+            "ticket_resolved",
+            t_res,
+            recorded_base + timedelta(minutes=20),
+            "agent",
+            str(user_id),
+            json.dumps(
+                ticket_events_repo.build_ticket_resolved_payload(
+                    resolved_at=t_res,
+                    from_status="open",
+                    to_status="resolved",
+                    elapsed_calendar_seconds=(t_res - historical_t0).total_seconds(),
+                )
+            ),
+        ),
+        # 4. ticket_processed (+2m, rec +40m, uid ...0004): genuine historical backdated occurred_at, recorded LAST
+        (
+            uid_processed,
+            "ticket_processed",
+            t_proc_backdated,
+            recorded_base + timedelta(minutes=40),
+            "worker",
+            None,
+            json.dumps(ticket_events_repo.build_ticket_processed_payload(from_status="new", to_status="open")),
+        ),
+        # 5. ticket_created (+0m, rec +1m, uid ...0005): earliest occurred_at despite highest UUID and last insert
+        (
+            uid_created,
+            "ticket_created",
+            historical_t0,
+            recorded_base + timedelta(minutes=1),
+            "customer",
+            None,
+            json.dumps(ticket_events_repo.build_ticket_created_payload()),
+        ),
+    ]
+
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("UPDATE tickets SET status = 'open' WHERE tenant_id = %s AND id = %s;", (tenant_id, t_ord.id))
-        ticket_repo.record_first_response(
-            conn=conn,
-            tenant_id=tenant_id,
-            ticket_id=t_ord.id,
-            responded_at=t0 + timedelta(minutes=10),
-            actor_id=str(user_id),
-        )
+            cur.execute(
+                """
+                INSERT INTO tickets (id, tenant_id, subject, body, status, created_at, first_response_at, resolved_at)
+                VALUES (%s, %s, 'Ordering Fixture Ticket', 'Body', 'closed', %s, %s, %s);
+                """,
+                (ord_ticket_id, tenant_id, historical_t0, t_fr, t_res),
+            )
+            for ev_id, ev_type, occ_at, rec_at, actor_type, actor_id, payload_json in fixture_rows_in_scrambled_insert_order:
+                cur.execute(
+                    """
+                    INSERT INTO ticket_events (
+                        id, tenant_id, ticket_id, event_type, occurred_at, recorded_at,
+                        actor_type, actor_id, schema_version, payload
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s,
+                        %s, %s, 1, %s::jsonb
+                    );
+                    """,
+                    (ev_id, tenant_id, ord_ticket_id, ev_type, occ_at, rec_at, actor_type, actor_id, payload_json),
+                )
 
-    # Now insert ticket_processed with BACKDATED occurred_at = t0 + 2m (later recorded_at, earlier occurred_at)
-    # and ticket_resolved with EQUAL occurred_at = t0 + 10m (later recorded_at -> tie-broken after first_response)
+    # Derive expected order from the fixture's stored PostgreSQL ordering keys independently of the endpoint result
     with conn.transaction():
-        ticket_events_repo.append_ticket_event(
-            conn_or_cur=conn,
-            tenant_id=tenant_id,
-            ticket_id=t_ord.id,
-            event_type="ticket_processed",
-            occurred_at=t0 + timedelta(minutes=2),
-            actor_type="worker",
-            payload=ticket_events_repo.build_ticket_processed_payload(from_status="new", to_status="open"),
-        )
-        ticket_repo.resolve_ticket(
-            conn=conn,
-            tenant_id=tenant_id,
-            ticket_id=t_ord.id,
-            resolved_at=t0 + timedelta(minutes=10),
-            actor_id=str(user_id),
-        )
-    conn.commit()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT id, event_type, occurred_at, recorded_at
+                FROM ticket_events
+                WHERE tenant_id = %s AND ticket_id = %s;
+                """,
+                (tenant_id, ord_ticket_id),
+            )
+            stored_rows = cur.fetchall()
+
+    expected_rows = sorted(
+        stored_rows,
+        key=lambda r: (
+            r["occurred_at"].astimezone(timezone.utc),
+            r["recorded_at"].astimezone(timezone.utc),
+            uuid.UUID(str(r["id"])),
+        ),
+    )
+    assert [uuid.UUID(str(r["id"])) for r in expected_rows] == [
+        uid_created,
+        uid_processed,
+        uid_first_resp,
+        uid_resolved,
+        uid_closed,
+    ]
 
     token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="agent", expires_delta=timedelta(minutes=60))
     client = TestClient(app, cookies={"triage_session": token})
@@ -899,18 +994,47 @@ def test_12_browser_events_legacy_empty_and_backdated_ordering(
     assert res_legacy.json()["schema_available"] is True
     assert res_legacy.json()["events"] == []
 
-    res_ord = client.get(f"/browser-api/tickets/{t_ord.id}/events")
+    res_ord = client.get(f"/browser-api/tickets/{ord_ticket_id}/events")
     assert res_ord.status_code == 200
+    assert res_ord.headers.get("cache-control") == "no-store"
     events = res_ord.json()["events"]
+
+    # 1. Exact count, identities, and PostgreSQL ordering contract (occurred_at ASC, recorded_at ASC, id ASC)
+    assert len(events) == len(expected_rows)
+    assert [uuid.UUID(e["id"]) for e in events] == [uuid.UUID(str(r["id"])) for r in expected_rows]
     assert [e["event_type"] for e in events] == [
         "ticket_created",
         "ticket_processed",
         "first_response_recorded",
         "ticket_resolved",
+        "ticket_closed",
     ]
-    # Backdated ticket_processed retains earlier occurred_at distinct from its later DB recorded_at
-    proc_ev = events[1]
-    assert datetime.fromisoformat(proc_ev["occurred_at"]) < datetime.fromisoformat(proc_ev["recorded_at"])
+    for ev, exp in zip(events, expected_rows):
+        assert uuid.UUID(ev["id"]) == uuid.UUID(str(exp["id"]))
+        assert datetime.fromisoformat(ev["occurred_at"]).astimezone(timezone.utc) == exp["occurred_at"].astimezone(timezone.utc)
+        assert datetime.fromisoformat(ev["recorded_at"]).astimezone(timezone.utc) == exp["recorded_at"].astimezone(timezone.utc)
+
+    # 2. Genuinely backdated ticket_processed sorts before later business-time events despite latest recorded_at
+    proc_ev, fr_ev, res_ev, cls_ev = events[1], events[2], events[3], events[4]
+    proc_occ = datetime.fromisoformat(proc_ev["occurred_at"]).astimezone(timezone.utc)
+    proc_rec = datetime.fromisoformat(proc_ev["recorded_at"]).astimezone(timezone.utc)
+    fr_occ = datetime.fromisoformat(fr_ev["occurred_at"]).astimezone(timezone.utc)
+    fr_rec = datetime.fromisoformat(fr_ev["recorded_at"]).astimezone(timezone.utc)
+    res_occ = datetime.fromisoformat(res_ev["occurred_at"]).astimezone(timezone.utc)
+    res_rec = datetime.fromisoformat(res_ev["recorded_at"]).astimezone(timezone.utc)
+    cls_occ = datetime.fromisoformat(cls_ev["occurred_at"]).astimezone(timezone.utc)
+    cls_rec = datetime.fromisoformat(cls_ev["recorded_at"]).astimezone(timezone.utc)
+
+    assert proc_occ < fr_occ
+    assert proc_rec > fr_rec
+    assert proc_occ < proc_rec < datetime.now(timezone.utc)
+
+    # 3. Equal-occurred_at tie-breaking: recorded_at ASC precedes higher-to-lower id, then id ASC breaks ties
+    assert fr_occ == res_occ == cls_occ
+    assert fr_rec < res_rec
+    assert uuid.UUID(fr_ev["id"]) > uuid.UUID(res_ev["id"])
+    assert res_rec == cls_rec
+    assert uuid.UUID(res_ev["id"]) < uuid.UUID(cls_ev["id"])
 
 
 # 13. Non-Destructive Missing-Relation Savepoint Recovery & HTTP Fallback Mapping
