@@ -5,6 +5,7 @@ import {
   SimilarTicketsResponse,
   RelevantKnowledgeResponse,
   TicketSLAResponse,
+  TicketEventsResponse,
 } from '../types';
 import { ProcessingBadge } from './ProcessingBadge';
 
@@ -21,6 +22,22 @@ const formatDuration = (mins: number) => {
   if (mins < 1440) return `${mins}m (${hours}h)`;
   const days = (mins / 1440).toFixed(1).replace('.0', '');
   return `${mins}m (${days}d)`;
+};
+
+const formatUtcTimestamp = (isoStr: string | null | undefined): string => {
+  if (!isoStr) return '—';
+  const parsed = new Date(isoStr);
+  if (Number.isNaN(parsed.getTime())) {
+    return isoStr;
+  }
+  return `${parsed.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
+};
+
+const formatElapsedSeconds = (seconds: number): string => {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  return formatDuration(Math.round(seconds / 60));
 };
 
 export const TicketDetailView = ({
@@ -46,6 +63,10 @@ export const TicketDetailView = ({
   const [slaLoading, setSlaLoading] = useState(true);
   const [slaError, setSlaError] = useState<string | null>(null);
 
+  const [eventsData, setEventsData] = useState<TicketEventsResponse | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+
   const [lifecyclePending, setLifecyclePending] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
 
@@ -55,9 +76,16 @@ export const TicketDetailView = ({
   const currentTicketIdRef = useRef(ticketId);
   currentTicketIdRef.current = ticketId;
   const requestSeqRef = useRef(0);
+  const eventsSeqRef = useRef(0);
+  const eventsAbortRef = useRef<AbortController | null>(null);
 
   const loadTicketData = async (targetTicketId: string, isManualRefresh = false) => {
     const seq = ++requestSeqRef.current;
+    const evSeq = ++eventsSeqRef.current;
+    eventsAbortRef.current?.abort();
+    const eventsController = new AbortController();
+    eventsAbortRef.current = eventsController;
+
     if (isManualRefresh) {
       setRefreshing(true);
     } else {
@@ -66,6 +94,7 @@ export const TicketDetailView = ({
       setSimilarData(null);
       setKnowledgeData(null);
       setSlaData(null);
+      setEventsData(null);
     }
     setError(null);
     setSimilarLoading(true);
@@ -74,12 +103,14 @@ export const TicketDetailView = ({
     setKnowledgeError(null);
     setSlaLoading(true);
     setSlaError(null);
+    setEventsLoading(true);
+    setEventsError(null);
     setLifecycleError(null);
     setRowPendingId(null);
     setRowErrors({});
 
     try {
-      const [ticketRes, similarRes, knowledgeRes, slaRes] = await Promise.all([
+      const [ticketRes, similarRes, knowledgeRes, slaRes, eventsRes] = await Promise.all([
         api.getTicketDetail(targetTicketId),
         api.getSimilarTickets(targetTicketId).catch((err) => {
           if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
@@ -96,6 +127,15 @@ export const TicketDetailView = ({
         api.getTicketSla(targetTicketId).catch((err) => {
           if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
             setSlaError(err instanceof Error ? err.message : 'Failed to fetch SLA evaluation.');
+          }
+          return null;
+        }),
+        api.getTicketEvents(targetTicketId, eventsController.signal).catch((err) => {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            return null;
+          }
+          if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
+            setEventsError(err instanceof Error ? err.message : 'Failed to load lifecycle timeline.');
           }
           return null;
         }),
@@ -121,11 +161,22 @@ export const TicketDetailView = ({
       if (slaRes) {
         setSlaData(slaRes);
       }
+
+      if (
+        eventsSeqRef.current === evSeq &&
+        eventsRes &&
+        eventsRes.ticket_id === targetTicketId
+      ) {
+        setEventsData(eventsRes);
+      }
     } catch (err) {
       if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
         setError(err instanceof Error ? err.message : 'Failed to load ticket.');
       }
     } finally {
+      if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
+        setEventsLoading(false);
+      }
       if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
         setSimilarLoading(false);
         setKnowledgeLoading(false);
@@ -135,6 +186,38 @@ export const TicketDetailView = ({
         } else {
           setLoading(false);
         }
+      }
+    }
+  };
+
+  const refreshEventsOnly = async (targetTicketId: string) => {
+    const evSeq = ++eventsSeqRef.current;
+    eventsAbortRef.current?.abort();
+    const controller = new AbortController();
+    eventsAbortRef.current = controller;
+
+    setEventsLoading(true);
+    setEventsError(null);
+    try {
+      const res = await api.getTicketEvents(targetTicketId, controller.signal);
+      if (
+        eventsSeqRef.current === evSeq &&
+        currentTicketIdRef.current === targetTicketId &&
+        res.ticket_id === targetTicketId
+      ) {
+        setEventsData(res);
+        setEventsError(null);
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
+        setEventsError(err instanceof Error ? err.message : 'Failed to load lifecycle timeline.');
+      }
+    } finally {
+      if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
+        setEventsLoading(false);
       }
     }
   };
@@ -171,7 +254,7 @@ export const TicketDetailView = ({
             },
           };
         });
-        await refreshSlaOnly(originId);
+        await Promise.all([refreshSlaOnly(originId), refreshEventsOnly(originId)]);
       }
     } catch (err: unknown) {
       if (currentTicketIdRef.current === originId) {
@@ -202,7 +285,7 @@ export const TicketDetailView = ({
             },
           };
         });
-        await refreshSlaOnly(originId);
+        await Promise.all([refreshSlaOnly(originId), refreshEventsOnly(originId)]);
       }
     } catch (err: unknown) {
       if (currentTicketIdRef.current === originId) {
@@ -232,7 +315,7 @@ export const TicketDetailView = ({
             },
           };
         });
-        await refreshSlaOnly(originId);
+        await Promise.all([refreshSlaOnly(originId), refreshEventsOnly(originId)]);
       }
     } catch (err: unknown) {
       if (currentTicketIdRef.current === originId) {
@@ -250,6 +333,8 @@ export const TicketDetailView = ({
     loadTicketData(ticketId, false);
     return () => {
       requestSeqRef.current++;
+      eventsSeqRef.current++;
+      eventsAbortRef.current?.abort();
     };
   }, [ticketId]);
 
@@ -1042,6 +1127,264 @@ export const TicketDetailView = ({
                   <strong>Notice</strong>: {knowledgeData.notice}
                 </p>
               </div>
+            )}
+          </div>
+
+          {/* Lifecycle Timeline Card */}
+          <div className="card" style={{ padding: '24px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                  Lifecycle Timeline
+                </h2>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Factual lifecycle history
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
+                {eventsData?.ordering_notice ||
+                  'Ordered by occurred_at ASC, recorded_at ASC, id ASC (stable event-time ordering, not guaranteed causal or commit visibility ordering).'}
+              </p>
+            </div>
+
+            {eventsLoading ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Loading lifecycle timeline...
+              </div>
+            ) : eventsError ? (
+              <div
+                className="alert alert-danger"
+                role="alert"
+                style={{
+                  margin: 0,
+                  fontSize: '13px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span>Unable to load lifecycle timeline: {eventsError}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => refreshEventsOnly(ticket.id)}
+                  disabled={eventsLoading}
+                  style={{ padding: '4px 10px', fontSize: '12px' }}
+                >
+                  Retry Timeline
+                </button>
+              </div>
+            ) : !eventsData?.schema_available ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  Lifecycle Timeline Unavailable
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {eventsData?.message ||
+                    'Migration 009 (ticket_events) is not provisioned in the database. Lifecycle event history is currently unavailable.'}
+                </p>
+              </div>
+            ) : eventsData.events.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  No lifecycle events recorded.
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  Legacy tickets created prior to event tracking have no entries in the lifecycle log; past transitions
+                  are not synthesized from current ticket fields.
+                </p>
+              </div>
+            ) : (
+              <ol
+                style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                {eventsData.events.map((ev) => (
+                  <li
+                    key={ev.id}
+                    style={{
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '12px 14px',
+                      backgroundColor: 'var(--bg-subtle)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>{ev.label}</strong>
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '11px',
+                            textTransform: 'capitalize',
+                            backgroundColor: 'var(--bg-card)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          Actor: {ev.actor_type}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
+                        Occurred: {formatUtcTimestamp(ev.occurred_at)}
+                      </span>
+                    </div>
+
+                    {ev.recorded_at && ev.recorded_at !== ev.occurred_at && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                        Recorded in event log: {formatUtcTimestamp(ev.recorded_at)}
+                      </div>
+                    )}
+
+                    {!ev.schema_supported ? (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        Event schema version v{ev.schema_version} is unsupported in this UI; details omitted.
+                      </div>
+                    ) : !ev.payload_valid || !ev.details ? (
+                      <div style={{ fontSize: '12px', color: 'var(--danger)', fontStyle: 'italic' }}>
+                        Recorded event payload is malformed or incomplete for schema v{ev.schema_version}; details
+                        omitted.
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {ev.event_type === 'ticket_created' && (
+                          <>
+                            {(ev.details.priority || ev.details.category) && (
+                              <div>
+                                Intake fields:{' '}
+                                {ev.details.priority && (
+                                  <span>
+                                    Priority <strong style={{ color: 'var(--text-main)' }}>{ev.details.priority}</strong>
+                                  </span>
+                                )}
+                                {ev.details.priority && ev.details.category ? ' · ' : ''}
+                                {ev.details.category && (
+                                  <span>
+                                    Category <strong style={{ color: 'var(--text-main)' }}>{ev.details.category}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {ev.details.intake_policy && (
+                              <div>
+                                <strong style={{ color: 'var(--text-main)' }}>Policy at intake:</strong>{' '}
+                                {ev.details.intake_policy.is_configured ? (
+                                  <span>
+                                    {ev.details.intake_policy.policy_priority || 'default'} policy
+                                    {ev.details.intake_policy.first_response_minutes !== null &&
+                                      ` · First response ${formatDuration(ev.details.intake_policy.first_response_minutes)}`}
+                                    {ev.details.intake_policy.resolution_minutes !== null &&
+                                      ` · Resolution ${formatDuration(ev.details.intake_policy.resolution_minutes)}`}
+                                    {' (snapshot at creation; does not freeze active targets or reflect later edits).'}
+                                  </span>
+                                ) : (
+                                  <span>Unconfigured at ticket creation.</span>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {ev.event_type === 'ticket_processed' && (
+                          <div>
+                            {ev.details.from_status && ev.details.to_status && (
+                              <span>
+                                Transition:{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                  {ev.details.from_status} → {ev.details.to_status}
+                                </strong>
+                              </span>
+                            )}
+                            {ev.details.predicted_category && (
+                              <span>
+                                {ev.details.from_status ? ' · ' : ''}
+                                Predicted category:{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{ev.details.predicted_category}</strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {ev.event_type === 'first_response_recorded' &&
+                          ev.details.elapsed_calendar_seconds !== null && (
+                            <div>
+                              Elapsed calendar time since creation:{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>
+                                {formatElapsedSeconds(ev.details.elapsed_calendar_seconds)}
+                              </strong>
+                            </div>
+                          )}
+
+                        {ev.event_type === 'ticket_resolved' && (
+                          <div>
+                            {ev.details.from_status && ev.details.to_status && (
+                              <span>
+                                Transition:{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                  {ev.details.from_status} → {ev.details.to_status}
+                                </strong>
+                              </span>
+                            )}
+                            {ev.details.elapsed_calendar_seconds !== null && (
+                              <span>
+                                {ev.details.from_status ? ' · ' : ''}
+                                Elapsed calendar time:{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                  {formatElapsedSeconds(ev.details.elapsed_calendar_seconds)}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {ev.event_type === 'ticket_closed' &&
+                          ev.details.from_status &&
+                          ev.details.to_status && (
+                            <div>
+                              Transition:{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>
+                                {ev.details.from_status} → {ev.details.to_status}
+                              </strong>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
             )}
           </div>
         </div>

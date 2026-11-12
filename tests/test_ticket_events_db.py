@@ -635,3 +635,347 @@ def test_10_legacy_tickets_without_fabricated_history(
     assert events_after[0].event_type == "ticket_resolved"
     assert events_after[0].occurred_at == resolve_time
 
+
+# 11. Browser Lifecycle Timeline Endpoint: Tenant Isolation, Privacy, and Policy Summary
+
+
+def test_11_browser_events_endpoint_lifecycle_and_privacy(
+    conn: psycopg.Connection[Any],
+    synthetic_tenant: tuple[uuid.UUID, uuid.UUID],
+) -> None:
+    """Real DB integration check for GET /browser-api/tickets/{id}/events auth, isolation, privacy, and intake policy."""
+    tenant_a, user_a = synthetic_tenant
+    tenant_b = uuid.uuid4()
+    user_b = uuid.uuid4()
+
+    # Configure default SLA policy on Tenant A and create ticket_conf
+    sla_repo.upsert_sla_policy(
+        conn=conn,
+        tenant_id=tenant_a,
+        name="Default SLA",
+        priority="default",
+        first_response_minutes=30,
+        resolution_minutes=240,
+    )
+    conn.commit()
+
+    secret_subject = "CONFIDENTIAL_SUBJECT_XYZ"
+    secret_body = "CONFIDENTIAL_BODY_CONTAINING_PII_SSN_123"
+    secret_email = "private.customer.pii@example.com"
+    secret_ext_id = "EXT-PRIVATE-98765"
+    secret_worker_id = "worker-private-pod-77"
+    secret_model_ver_id = uuid.uuid4()
+
+    ticket_conf, _ = ticket_repo.create_or_get_ticket(
+        conn=conn,
+        tenant_id=tenant_a,
+        subject=secret_subject,
+        body=secret_body,
+        customer_email=secret_email,
+        external_id=secret_ext_id,
+    )
+
+    # Remove default policy and create ticket_unconf
+    sla_repo.delete_sla_policy(conn, tenant_a, "default")
+    ticket_unconf, _ = ticket_repo.create_or_get_ticket(
+        conn=conn,
+        tenant_id=tenant_a,
+        subject="Unconfigured Intake",
+        body="No policy active",
+    )
+
+    # Record worker processed + full agent lifecycle on ticket_conf without starting worker/ML
+    t_proc = ticket_conf.created_at + timedelta(seconds=5)
+    t_fr = ticket_conf.created_at + timedelta(minutes=10)
+    t_res = ticket_conf.created_at + timedelta(minutes=25)
+    t_cls = ticket_conf.created_at + timedelta(minutes=40)
+
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("UPDATE tickets SET status = 'open' WHERE tenant_id = %s AND id = %s;", (tenant_a, ticket_conf.id))
+            ticket_events_repo.append_ticket_event(
+                conn_or_cur=cur,
+                tenant_id=tenant_a,
+                ticket_id=ticket_conf.id,
+                event_type="ticket_processed",
+                occurred_at=t_proc,
+                actor_type="worker",
+                actor_id=secret_worker_id,
+                payload=ticket_events_repo.build_ticket_processed_payload(
+                    from_status="new",
+                    to_status="open",
+                    predicted_category="Credit card",
+                    model_version_id=str(secret_model_ver_id),
+                ),
+            )
+
+        ticket_repo.record_first_response(
+            conn=conn,
+            tenant_id=tenant_a,
+            ticket_id=ticket_conf.id,
+            responded_at=t_fr,
+            actor_id=str(user_a),
+        )
+        ticket_repo.resolve_ticket(
+            conn=conn,
+            tenant_id=tenant_a,
+            ticket_id=ticket_conf.id,
+            resolved_at=t_res,
+            actor_id=str(user_a),
+        )
+        ticket_repo.close_ticket(
+            conn=conn,
+            tenant_id=tenant_a,
+            ticket_id=ticket_conf.id,
+            closed_at=t_cls,
+            actor_id=str(user_a),
+        )
+
+    # Create Tenant B for cross-tenant isolation check
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO tenants (id, name, plan) VALUES (%s, %s, 'free');", (tenant_b, f"TenantB-{tenant_b.hex[:8]}"))
+            cur.execute(
+                "INSERT INTO users (id, tenant_id, email, password_hash, role) VALUES (%s, %s, %s, %s, 'agent');",
+                (user_b, tenant_b, f"agentb-{user_b.hex[:8]}@example.com", hash_password("test-pass-123")),
+            )
+    conn.commit()
+
+    try:
+        # 1. Unauthenticated access rejected with 401 + no-store
+        unauth_client = TestClient(app)
+        res_unauth = unauth_client.get(f"/browser-api/tickets/{ticket_conf.id}/events")
+        assert res_unauth.status_code == 401
+        assert res_unauth.json()["error"]["code"] == "unauthenticated"
+        assert res_unauth.headers.get("cache-control") == "no-store"
+
+        # 2. Owning tenant (Tenant A) receives all 5 allowlisted events without PII/internal IDs
+        token_a = create_access_token(user_id=user_a, tenant_id=tenant_a, role="admin", expires_delta=timedelta(minutes=60))
+        client_a = TestClient(app, cookies={"triage_session": token_a})
+
+        res_a = client_a.get(f"/browser-api/tickets/{ticket_conf.id}/events")
+        assert res_a.status_code == 200
+        assert res_a.headers.get("cache-control") == "no-store"
+
+        raw_a = res_a.text
+        for forbidden in (
+            str(user_a),
+            secret_worker_id,
+            str(secret_model_ver_id),
+            secret_subject,
+            secret_body,
+            secret_email,
+            secret_ext_id,
+            '"actor_id"',
+            '"policy_id"',
+            '"model_version_id"',
+            '"tenant_id"',
+        ):
+            assert forbidden not in raw_a
+
+        data_a = res_a.json()
+        assert data_a["schema_available"] is True
+        assert data_a["ticket_id"] == str(ticket_conf.id)
+        assert [e["event_type"] for e in data_a["events"]] == [
+            "ticket_created",
+            "ticket_processed",
+            "first_response_recorded",
+            "ticket_resolved",
+            "ticket_closed",
+        ]
+        assert data_a["events"][0]["details"]["intake_policy"] == {
+            "is_configured": True,
+            "policy_priority": "default",
+            "first_response_minutes": 30,
+            "resolution_minutes": 240,
+        }
+        assert all(e["schema_supported"] and e["payload_valid"] for e in data_a["events"])
+
+        # Unconfigured policy ticket preserves honest unconfigured snapshot
+        res_unconf = client_a.get(f"/browser-api/tickets/{ticket_unconf.id}/events")
+        assert res_unconf.status_code == 200
+        assert res_unconf.json()["events"][0]["details"]["intake_policy"] == {
+            "is_configured": False,
+            "policy_priority": None,
+            "first_response_minutes": None,
+            "resolution_minutes": None,
+        }
+
+        # 3. Tenant B receives exact same 404 for Tenant A's ticket as for a non-existent ticket
+        token_b = create_access_token(user_id=user_b, tenant_id=tenant_b, role="agent", expires_delta=timedelta(minutes=60))
+        client_b = TestClient(app, cookies={"triage_session": token_b})
+
+        res_foreign = client_b.get(f"/browser-api/tickets/{ticket_conf.id}/events")
+        res_missing = client_b.get(f"/browser-api/tickets/{uuid.uuid4()}/events")
+        assert res_foreign.status_code == 404
+        assert res_missing.status_code == 404
+        assert res_foreign.json() == res_missing.json() == {
+            "error": {"code": "not_found", "message": "Ticket not found."}
+        }
+    finally:
+        if conn.info.transaction_status in (
+            psycopg.pq.TransactionStatus.INERROR,
+            psycopg.pq.TransactionStatus.INTRANS,
+        ):
+            conn.rollback()
+        with conn.transaction():
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM tenants WHERE id = %s;", (tenant_b,))
+        conn.commit()
+
+
+# 12. Browser Lifecycle Timeline Endpoint: Legacy Empty History & Backdated Ordering
+
+
+def test_12_browser_events_legacy_empty_and_backdated_ordering(
+    conn: psycopg.Connection[Any],
+    synthetic_tenant: tuple[uuid.UUID, uuid.UUID],
+) -> None:
+    """Legacy tickets return empty events; deliberately backdated occurred_at orders by occurred_at ASC, recorded_at ASC, id ASC."""
+    tenant_id, user_id = synthetic_tenant
+    base_time = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    # Case A: Legacy ticket with zero event rows
+    legacy_id = uuid.uuid4()
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO tickets (id, tenant_id, subject, body, status, created_at)
+                VALUES (%s, %s, 'Legacy No-Events Ticket', 'Body', 'open', %s);
+                """,
+                (legacy_id, tenant_id, base_time - timedelta(days=3)),
+            )
+
+    # Case B: Ticket with out-of-order insertion & backdated business occurred_at
+    t_ord, _ = ticket_repo.create_or_get_ticket(
+        conn=conn,
+        tenant_id=tenant_id,
+        subject="Ordering Ticket",
+        body="Body",
+    )
+    t_created_ev = ticket_events_repo.list_ticket_events(conn, tenant_id, t_ord.id)[0]
+    t0 = t_created_ev.occurred_at
+
+    # Insert first_response at t0 + 10m first (earlier recorded_at)
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("UPDATE tickets SET status = 'open' WHERE tenant_id = %s AND id = %s;", (tenant_id, t_ord.id))
+        ticket_repo.record_first_response(
+            conn=conn,
+            tenant_id=tenant_id,
+            ticket_id=t_ord.id,
+            responded_at=t0 + timedelta(minutes=10),
+            actor_id=str(user_id),
+        )
+
+    # Now insert ticket_processed with BACKDATED occurred_at = t0 + 2m (later recorded_at, earlier occurred_at)
+    # and ticket_resolved with EQUAL occurred_at = t0 + 10m (later recorded_at -> tie-broken after first_response)
+    with conn.transaction():
+        ticket_events_repo.append_ticket_event(
+            conn_or_cur=conn,
+            tenant_id=tenant_id,
+            ticket_id=t_ord.id,
+            event_type="ticket_processed",
+            occurred_at=t0 + timedelta(minutes=2),
+            actor_type="worker",
+            payload=ticket_events_repo.build_ticket_processed_payload(from_status="new", to_status="open"),
+        )
+        ticket_repo.resolve_ticket(
+            conn=conn,
+            tenant_id=tenant_id,
+            ticket_id=t_ord.id,
+            resolved_at=t0 + timedelta(minutes=10),
+            actor_id=str(user_id),
+        )
+    conn.commit()
+
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="agent", expires_delta=timedelta(minutes=60))
+    client = TestClient(app, cookies={"triage_session": token})
+
+    res_legacy = client.get(f"/browser-api/tickets/{legacy_id}/events")
+    assert res_legacy.status_code == 200
+    assert res_legacy.headers.get("cache-control") == "no-store"
+    assert res_legacy.json()["schema_available"] is True
+    assert res_legacy.json()["events"] == []
+
+    res_ord = client.get(f"/browser-api/tickets/{t_ord.id}/events")
+    assert res_ord.status_code == 200
+    events = res_ord.json()["events"]
+    assert [e["event_type"] for e in events] == [
+        "ticket_created",
+        "ticket_processed",
+        "first_response_recorded",
+        "ticket_resolved",
+    ]
+    # Backdated ticket_processed retains earlier occurred_at distinct from its later DB recorded_at
+    proc_ev = events[1]
+    assert datetime.fromisoformat(proc_ev["occurred_at"]) < datetime.fromisoformat(proc_ev["recorded_at"])
+
+
+# 13. Non-Destructive Missing-Relation Savepoint Recovery & HTTP Fallback Mapping
+
+
+def test_13_missing_relation_savepoint_recovery_and_http_fallback(
+    conn: psycopg.Connection[Any],
+    synthetic_tenant: tuple[uuid.UUID, uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify real PostgreSQL UndefinedTable + SAVEPOINT recovery via SET LOCAL search_path = '' without DDL."""
+    tenant_id, user_id = synthetic_tenant
+    ticket, _ = ticket_repo.create_or_get_ticket(conn, tenant_id, "Fallback Check", "Body")
+    conn.commit()
+
+    # Part A: Dedicated connection proves PostgreSQL raises real UndefinedTable and repo savepoint keeps outer txn alive
+    dedicated_conn = psycopg.connect(TARGET_DB_URL)
+    try:
+        with dedicated_conn.transaction():
+            with dedicated_conn.cursor() as cur:
+                cur.execute("SET LOCAL search_path = '';")
+
+            with pytest.raises(ticket_events_repo.TicketEventsSchemaUnavailableError) as exc_info:
+                ticket_events_repo.list_ticket_events(
+                    dedicated_conn,
+                    tenant_id,
+                    ticket.id,
+                    limit=ticket_events_repo.BOUNDED_EVENT_READ_LIMIT,
+                )
+            assert isinstance(exc_info.value.__cause__, psycopg.errors.UndefinedTable)
+
+            # Outer transaction must remain usable (not INERROR / InFailedSqlTransaction)
+            with dedicated_conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("SELECT 1 AS alive;")
+                row = cur.fetchone()
+                assert row is not None and row["alive"] == 1
+        dedicated_conn.rollback()
+    finally:
+        dedicated_conn.close()
+
+    # Part B: Endpoint mapping using test-local search_path wrapper around real repository read (restored cleanly)
+    real_list_ticket_events = ticket_events_repo.list_ticket_events
+
+    def _scoped_empty_search_path_list(conn_or_cur: Any, tid: uuid.UUID, tk_id: uuid.UUID, *, limit: int | None = None):
+        with conn_or_cur.transaction():
+            with conn_or_cur.cursor() as cur:
+                cur.execute("SET LOCAL search_path = '';")
+            return real_list_ticket_events(conn_or_cur, tid, tk_id, limit=limit)
+
+    token = create_access_token(user_id=user_id, tenant_id=tenant_id, role="agent", expires_delta=timedelta(minutes=60))
+    client = TestClient(app, cookies={"triage_session": token})
+
+    with monkeypatch.context() as mp:
+        mp.setattr(ticket_events_repo, "list_ticket_events", _scoped_empty_search_path_list)
+        res_fallback = client.get(f"/browser-api/tickets/{ticket.id}/events")
+
+    assert res_fallback.status_code == 200
+    assert res_fallback.headers.get("cache-control") == "no-store"
+    body = res_fallback.json()
+    assert body["schema_available"] is False
+    assert body["events"] == []
+    assert "009" in body["message"]
+
+    # After wrapper removal, pool connection remains healthy and returns real events normally
+    res_ok = client.get(f"/browser-api/tickets/{ticket.id}/events")
+    assert res_ok.status_code == 200
+    assert res_ok.json()["schema_available"] is True
+    assert len(res_ok.json()["events"]) == 1

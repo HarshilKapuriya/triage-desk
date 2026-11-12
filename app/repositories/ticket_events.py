@@ -12,11 +12,32 @@ Per Phase 5 specifications & architectural decisions:
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import re
 from typing import Any
 import uuid
 
 import psycopg
+import psycopg.errors
 from psycopg.rows import dict_row
+
+BOUNDED_EVENT_READ_LIMIT = 20
+MAX_EVENT_READ_LIMIT = 100
+
+
+class TicketEventsSchemaUnavailableError(Exception):
+    """Raised when the ticket_events table does not exist in the database (migration 009 unapplied)."""
+
+
+def _is_ticket_events_undefined(exc: psycopg.errors.UndefinedTable) -> bool:
+    """Return True only when UndefinedTable specifically refers to the ticket_events relation."""
+    table_name = getattr(getattr(exc, "diag", None), "table_name", None)
+    if table_name:
+        return table_name == "ticket_events"
+    msg = str(exc).lower()
+    return bool(re.search(r'(?:"|public\.)?\bticket_events\b', msg)) and (
+        "does not exist" in msg or "undefined" in msg or "no such table" in msg or msg.strip() == "ticket_events"
+    )
+
 
 ALLOWED_EVENT_TYPES = {
     "ticket_created",
@@ -164,29 +185,58 @@ def list_ticket_events(
     conn_or_cur: Any,
     tenant_id: uuid.UUID,
     ticket_id: uuid.UUID,
+    *,
+    limit: int | None = None,
 ) -> list[TicketEventRecord]:
     """Retrieve chronological event history for a ticket strictly scoped to tenant_id.
 
     Deterministic tie-breaker: occurred_at ASC, recorded_at ASC, id ASC.
+    When limit is provided, binds LIMIT %s to keep history reads bounded.
+    Translates only missing ticket_events relation errors into TicketEventsSchemaUnavailableError.
     """
-    query = """
-        SELECT id, tenant_id, ticket_id, event_type, occurred_at, recorded_at, actor_type, actor_id, schema_version, payload
-        FROM ticket_events
-        WHERE tenant_id = %s AND ticket_id = %s
-        ORDER BY occurred_at ASC, recorded_at ASC, id ASC;
-    """
-    params = (tenant_id, ticket_id)
-
-    if hasattr(conn_or_cur, "cursor"):
-        with conn_or_cur.cursor(row_factory=dict_row) as cur:
-            cur.execute(query, params)
-            rows = cur.fetchall()
-            return [_row_to_event(r) for r in rows]
+    if limit is not None:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > MAX_EVENT_READ_LIMIT:
+            raise ValueError(f"limit must be an integer between 1 and {MAX_EVENT_READ_LIMIT} (received {limit!r}).")
+        query = """
+            SELECT id, tenant_id, ticket_id, event_type, occurred_at, recorded_at, actor_type, actor_id, schema_version, payload
+            FROM ticket_events
+            WHERE tenant_id = %s AND ticket_id = %s
+            ORDER BY occurred_at ASC, recorded_at ASC, id ASC
+            LIMIT %s;
+        """
+        params: tuple[Any, ...] = (tenant_id, ticket_id, limit)
     else:
-        cur = conn_or_cur
-        cur.execute(query, params)
-        rows = cur.fetchall() if hasattr(cur, "fetchall") else []
-        return [_row_to_event(r) for r in rows]
+        query = """
+            SELECT id, tenant_id, ticket_id, event_type, occurred_at, recorded_at, actor_type, actor_id, schema_version, payload
+            FROM ticket_events
+            WHERE tenant_id = %s AND ticket_id = %s
+            ORDER BY occurred_at ASC, recorded_at ASC, id ASC;
+        """
+        params = (tenant_id, ticket_id)
+
+    try:
+        if hasattr(conn_or_cur, "cursor"):
+            if hasattr(conn_or_cur, "transaction"):
+                with conn_or_cur.transaction():
+                    with conn_or_cur.cursor(row_factory=dict_row) as cur:
+                        cur.execute(query, params)
+                        rows = cur.fetchall()
+                        return [_row_to_event(r) for r in rows]
+            with conn_or_cur.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+                return [_row_to_event(r) for r in rows]
+        else:
+            cur = conn_or_cur
+            cur.execute(query, params)
+            rows = cur.fetchall() if hasattr(cur, "fetchall") else []
+            return [_row_to_event(r) for r in rows]
+    except psycopg.errors.UndefinedTable as exc:
+        if _is_ticket_events_undefined(exc):
+            raise TicketEventsSchemaUnavailableError(
+                "Ticket lifecycle events schema is not provisioned (migration 009)."
+            ) from exc
+        raise
 
 
 # Payload Construction Helpers
