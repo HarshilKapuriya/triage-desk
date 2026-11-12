@@ -81,10 +81,6 @@ export const TicketDetailView = ({
 
   const loadTicketData = async (targetTicketId: string, isManualRefresh = false) => {
     const seq = ++requestSeqRef.current;
-    const evSeq = ++eventsSeqRef.current;
-    eventsAbortRef.current?.abort();
-    const eventsController = new AbortController();
-    eventsAbortRef.current = eventsController;
 
     if (isManualRefresh) {
       setRefreshing(true);
@@ -109,8 +105,11 @@ export const TicketDetailView = ({
     setRowPendingId(null);
     setRowErrors({});
 
+    // Fetch lifecycle timeline independently so slow event reads do not block rendering primary ticket details
+    void refreshEventsOnly(targetTicketId);
+
     try {
-      const [ticketRes, similarRes, knowledgeRes, slaRes, eventsRes] = await Promise.all([
+      const [ticketRes, similarRes, knowledgeRes, slaRes] = await Promise.all([
         api.getTicketDetail(targetTicketId),
         api.getSimilarTickets(targetTicketId).catch((err) => {
           if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
@@ -127,15 +126,6 @@ export const TicketDetailView = ({
         api.getTicketSla(targetTicketId).catch((err) => {
           if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
             setSlaError(err instanceof Error ? err.message : 'Failed to fetch SLA evaluation.');
-          }
-          return null;
-        }),
-        api.getTicketEvents(targetTicketId, eventsController.signal).catch((err) => {
-          if (err instanceof DOMException && err.name === 'AbortError') {
-            return null;
-          }
-          if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
-            setEventsError(err instanceof Error ? err.message : 'Failed to load lifecycle timeline.');
           }
           return null;
         }),
@@ -161,22 +151,13 @@ export const TicketDetailView = ({
       if (slaRes) {
         setSlaData(slaRes);
       }
-
-      if (
-        eventsSeqRef.current === evSeq &&
-        eventsRes &&
-        eventsRes.ticket_id === targetTicketId
-      ) {
-        setEventsData(eventsRes);
-      }
     } catch (err) {
       if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
+        eventsSeqRef.current++;
+        eventsAbortRef.current?.abort();
         setError(err instanceof Error ? err.message : 'Failed to load ticket.');
       }
     } finally {
-      if (eventsSeqRef.current === evSeq && currentTicketIdRef.current === targetTicketId) {
-        setEventsLoading(false);
-      }
       if (requestSeqRef.current === seq && currentTicketIdRef.current === targetTicketId) {
         setSimilarLoading(false);
         setKnowledgeLoading(false);
@@ -470,11 +451,22 @@ export const TicketDetailView = ({
 
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-main)' }}>{ticket.subject}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-main)', overflowWrap: 'anywhere' }}>
+            {ticket.subject}
+          </h1>
           <span className={`badge badge-status-${ticket.status.toLowerCase()}`}>{ticket.status}</span>
         </div>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+        <div
+          style={{
+            fontSize: '13px',
+            color: 'var(--text-muted)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '16px',
+            overflowWrap: 'anywhere',
+          }}
+        >
           <span>
             ID: <code className="text-mono">{ticket.id}</code>
           </span>
@@ -615,16 +607,9 @@ export const TicketDetailView = ({
       )}
 
       {/* Two-Column Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 380px',
-          gap: '24px',
-          alignItems: 'start',
-        }}
-      >
+      <div className="ticket-detail-grid">
         {/* Left: Consumer Complaint Narrative & Similar Tickets */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="ticket-detail-main">
           <div className="card" style={{ padding: '24px' }}>
             <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -1131,9 +1116,17 @@ export const TicketDetailView = ({
           </div>
 
           {/* Lifecycle Timeline Card */}
-          <div className="card" style={{ padding: '24px' }}>
+          <div className="card" style={{ padding: '24px', overflowWrap: 'anywhere' }}>
             <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
                 <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                   Lifecycle Timeline
                 </h2>
@@ -1243,7 +1236,7 @@ export const TicketDetailView = ({
                         marginBottom: '6px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>{ev.label}</strong>
                         <span
                           className="badge"
@@ -1390,7 +1383,7 @@ export const TicketDetailView = ({
         </div>
 
         {/* Right: Triage & Model Diagnostics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="ticket-detail-sidebar">
           {/* Card: SLA Target & Timeliness */}
           <div className="card" style={{ padding: '20px' }}>
             <div
