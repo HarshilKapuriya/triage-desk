@@ -856,7 +856,7 @@ def test_12_browser_events_legacy_empty_and_backdated_ordering(
     # Case B: Synthetic event-read ordering fixture with historical business baseline & explicit tie-break keys.
     # Deterministic UUID suffixes share a per-test unique 96-bit prefix so ordering does not rely on uuid4 luck.
     ord_ticket_id = uuid.uuid4()
-    uid_prefix = uuid.uuid4().hex[:24]
+    uid_prefix = uuid.uuid4().hex[:20]
     uid_resolved = uuid.UUID(f"{uid_prefix}000000000001")
     uid_closed = uuid.UUID(f"{uid_prefix}000000000002")
     uid_first_resp = uuid.UUID(f"{uid_prefix}000000000003")
