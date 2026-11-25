@@ -36,6 +36,12 @@ experiments/models/
 *.onnx
 .tmp_download_*
 
+# Tracked model artifacts for CI and production inference
+!experiments/runs/run_004_cfpb_imbalance_tuning/models/
+experiments/runs/run_004_cfpb_imbalance_tuning/models/*
+!experiments/runs/run_004_cfpb_imbalance_tuning/models/selected_cw_None_C_1.0.joblib
+!experiments/runs/run_006_sla_risk_feasibility/model.joblib
+
 # Node & Frontend build artifacts
 node_modules/
 dist/

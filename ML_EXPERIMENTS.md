@@ -16,6 +16,19 @@ This document records the Phase 3 exploration, dataset audits, baseline comparis
 
 ## 2. Synthetic Dataset Smoke Test & Template Leakage Analysis
 
+### A. Provenance, License & Upstream Verification
+* **Source**: Hosted on Kaggle by creator Biswajit Pasi at [`https://www.kaggle.com/datasets/biswajitpasi/customer-support-tickets`](https://www.kaggle.com/datasets/biswajitpasi/customer-support-tickets).
+* **Stated License**: MIT License (declared in Kaggle platform dataset metadata).
+* **Verification Date**: 2026-11-25.
+* **Attribution & Notice Limitations**:
+  * Kaggle platform metadata lists the dataset license as "MIT", but the public listing does not supply a formal copyright notice line (e.g. `Copyright (c) <year> <author>`) or a standalone `LICENSE` file.
+  * In keeping with repository documentation practice, this absence of an explicit upstream copyright header is recorded as a known limitation; no copyright notice is fabricated, and full legal clearance cannot be asserted without upstream clarification.
+* **Distinction Between Dataset Licensing and Artifact Provenance**:
+  * The stated MIT license applies to the upstream tabular CSV data (`data/customer_support_tickets.csv`), which remains untracked and gitignored.
+  * The trained artifact (`experiments/runs/run_006_sla_risk_feasibility/model.joblib`) is an internally trained 38 KB binary containing scikit-learn `Pipeline(ColumnTransformer([TfidfVectorizer, OneHotEncoder]), LogisticRegression)` parameters across three intake features (text `message`, and categorical metadata `product` and `channel`) produced by `scripts/train_sla_risk.py`.
+  * The dataset was utilized strictly as an offline feasibility and regression test fixture. The presence of synthetic template personas does not establish an absence of privacy risk or full legal clearance.
+
+### B. Dataset Structure & Leakage Analysis
 * **Dataset Candidate**: `biswajitpasi/customer-support-tickets` (20,000 rows).
 * **Initial Observation**:
   * Both TF-IDF + Logistic Regression and TF-IDF + LinearSVC achieved **1.0000 Accuracy** and **1.0000 Macro-F1** on a 70/15/15 chronological split.
@@ -164,4 +177,28 @@ Comparing the unweighted winner against `class_weight='balanced', C=0.1` demonst
   * **Priority Status**: Priority prediction remains explicitly deferred.
   * **Integration Tests**: [`tests/test_ml_integration_db.py`](file:///C:/Users/91931/OneDrive/Desktop/Major%20Project/Ticket%20Intelligence%20Platform/triage-desk/tests/test_ml_integration_db.py) (8 tests covering valid labels, detail endpoint exposure, tenant isolation, retry idempotency, stale claim rollback, and missing/corrupt artifact handling).
   * **CI Status**: GitHub Actions CI remains marked blocked due to the outstanding repository billing lock; gated via local test execution against `TEST_DATABASE_URL`.
+
+---
+
+## 9. Model Artifact Provisioning & CI Tracking
+
+To ensure deterministic, reproducible test and worker execution without external storage or Git LFS dependencies, exact verified model artifacts are tracked directly in Git under ordinary version control:
+
+1. **CFPB Financial Classifier (`run_004`)**:
+   - **Path**: `experiments/runs/run_004_cfpb_imbalance_tuning/models/selected_cw_None_C_1.0.joblib`
+   - **Size**: 3,214,288 bytes (~3.07 MiB)
+   - **Expected SHA-256**: `7e833e8992a3150bdaf2489b9b9117d700f7875e9dde045e4f638bd1e656b360`
+   - **Verification**: Verified at load time by `app/ml/loader.py` against `EXPECTED_MODEL_SHA256`.
+   - **Provenance & Licensing**: Trained on CFPB public domain complaint narratives (17 U.S.C. § 105 / CC0 1.0 Universal). Binary artifact contains TF-IDF unigram/bigram parameters and LinearSVC hyperplane weights.
+
+2. **SLA-Risk Feasibility Baseline (`run_006`)**:
+   - **Path**: `experiments/runs/run_006_sla_risk_feasibility/model.joblib`
+   - **Size**: 38,097 bytes (~0.04 MiB)
+   - **Expected SHA-256**: `4d20957606f09b99039ce9e547efe4badf45bfad025baf617d0f384d654ca93a`
+   - **Verification**: Verified by `tests/test_sla_risk_artifact_integration.py` against `experiments/runs/run_006_sla_risk_feasibility/model.joblib.sha256`.
+   - **Provenance & Licensing**: Trained offline via `scripts/train_sla_risk.py` on the synthetic `biswajitpasi/customer-support-tickets` benchmark (Kaggle metadata indicates MIT license, verified 2026-11-25; formal copyright notice unprovided upstream). The trained binary consists of scikit-learn `Pipeline(ColumnTransformer([TfidfVectorizer, OneHotEncoder]), LogisticRegression)` parameters over three $T_0$ intake features (`message`, `product`, `channel`), retained as an offline integration test fixture.
+
+### CI Checkout & Ignore Rules
+- Both files are exempted from `.gitignore` via narrowly scoped exception rules while keeping general `*.joblib`, `models/`, and `data/*` patterns intact.
+- Standard `actions/checkout` in CI workflows automatically supplies these tracked artifacts with no external downloads, artifact caches, or LFS setup required.
 
