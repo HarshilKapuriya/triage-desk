@@ -29,22 +29,12 @@ export const Header = ({
         </button>
 
         {user && onNavigateKB && (
-          <nav style={{ display: 'flex', gap: '8px' }}>
+          <nav className="nav-segmented-dock">
             {onNavigateDashboard && (
               <button
                 type="button"
                 onClick={onNavigateDashboard}
-                style={{
-                  background: currentView === 'dashboard' ? 'var(--bg-subtle)' : 'none',
-                  border: '1px solid',
-                  borderColor: currentView === 'dashboard' ? 'var(--border-color)' : 'transparent',
-                  borderRadius: '4px',
-                  padding: '4px 10px',
-                  fontSize: '13px',
-                  fontWeight: currentView === 'dashboard' ? 600 : 400,
-                  color: 'var(--text-main)',
-                  cursor: 'pointer',
-                }}
+                className={`nav-pill-btn ${currentView === 'dashboard' ? 'active' : ''}`}
               >
                 Dashboard
               </button>
@@ -52,34 +42,14 @@ export const Header = ({
             <button
               type="button"
               onClick={onNavigateHome}
-              style={{
-                background: currentView === 'tickets' ? 'var(--bg-subtle)' : 'none',
-                border: '1px solid',
-                borderColor: currentView === 'tickets' ? 'var(--border-color)' : 'transparent',
-                borderRadius: '4px',
-                padding: '4px 10px',
-                fontSize: '13px',
-                fontWeight: currentView === 'tickets' ? 600 : 400,
-                color: 'var(--text-main)',
-                cursor: 'pointer',
-              }}
+              className={`nav-pill-btn ${currentView === 'tickets' ? 'active' : ''}`}
             >
               Tickets Queue
             </button>
             <button
               type="button"
               onClick={onNavigateKB}
-              style={{
-                background: currentView === 'knowledge-base' ? 'var(--bg-subtle)' : 'none',
-                border: '1px solid',
-                borderColor: currentView === 'knowledge-base' ? 'var(--border-color)' : 'transparent',
-                borderRadius: '4px',
-                padding: '4px 10px',
-                fontSize: '13px',
-                fontWeight: currentView === 'knowledge-base' ? 600 : 400,
-                color: 'var(--text-main)',
-                cursor: 'pointer',
-              }}
+              className={`nav-pill-btn ${currentView === 'knowledge-base' ? 'active' : ''}`}
             >
               Knowledge Base
             </button>
@@ -94,19 +64,7 @@ export const Header = ({
               <button
                 type="button"
                 onClick={onOpenSlaModal}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  padding: '4px 10px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: 'var(--text-main)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
+                className="btn-header-action"
                 title="Configure Tenant SLA Policies (Admin only)"
               >
                 ⚙ SLA Policies

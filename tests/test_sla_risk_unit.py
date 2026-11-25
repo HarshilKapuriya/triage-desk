@@ -6,17 +6,19 @@ Tests strictly cover:
 3. Missing/invalid input handling.
 4. Split disjointness and group separation.
 5. Preprocessing fitted only on training data.
-6. Serialization and reload consistency using the produced artifact.
-7. Finite output scores within the expected [0.0, 1.0] range.
+6. Synthetic pipeline serialization, SHA-256 integrity, and reload consistency.
+7. Synthetic pipeline finite output scores and probability normalization within [0.0, 1.0].
 """
 
 import csv
 import json
 import subprocess
 from pathlib import Path
+from typing import Any, Dict
 import numpy as np
 import pytest
 import joblib
+from sklearn.linear_model import LogisticRegression
 
 from scripts.train_sla_risk import (
     FEATURE_ALLOWLIST,
@@ -198,14 +200,58 @@ def test_preprocessing_fitted_only_on_train():
     assert [list(c) for c in cat_transformer.categories_] == initial_categories
 
 
-def test_model_serialization_and_reload_consistency():
-    """Verify saved model artifact can be reloaded and yields identical predictions."""
-    run_dir = Path("experiments/runs/run_006_sla_risk_feasibility")
-    model_path = run_dir / "model.joblib"
-    sha256_path = run_dir / "model.joblib.sha256"
+@pytest.fixture
+def synthetic_sla_pipeline(tmp_path: Path) -> Dict[str, Any]:
+    """Explicit, non-autouse fixture providing a tiny deterministic synthetic SLA pipeline.
 
-    assert model_path.exists(), "model.joblib missing"
-    assert sha256_path.exists(), "model.joblib.sha256 missing"
+    Fitted on entirely synthetic data with fixed random seed (42).
+    Serialized strictly under pytest tmp_path with a companion SHA-256 integrity file.
+    Does NOT modify experiments/ or evaluate real-world run_006 performance.
+    """
+    train_rows = [
+        {"message": "Payment processing error on checkout", "product": "PayWallet", "channel": "Email"},
+        {"message": "Routine app interface update feedback", "product": "CloudDrive", "channel": "Chat"},
+        {"message": "Account access blocked reset required", "product": "PayWallet", "channel": "Phone"},
+        {"message": "Sync complete successfully without errors", "product": "CloudDrive", "channel": "Email"},
+    ]
+    y_train = np.array([1, 0, 1, 0])
+    X_train = build_feature_matrix(train_rows)
+
+    pipeline = create_text_metadata_pipeline(random_state=42)
+    pipeline.fit(X_train, y_train)
+
+    model_path = tmp_path / "synthetic_model.joblib"
+    sha256_path = tmp_path / "synthetic_model.joblib.sha256"
+
+    joblib.dump(pipeline, model_path)
+    digest = compute_sha256(model_path)
+    with open(sha256_path, "w", encoding="utf-8") as f:
+        f.write(f"{digest}  synthetic_model.joblib\n")
+
+    return {
+        "model_path": model_path,
+        "sha256_path": sha256_path,
+        "pipeline": pipeline,
+    }
+
+
+def test_synthetic_model_serialization_and_reload_consistency(
+    synthetic_sla_pipeline: Dict[str, Any],
+) -> None:
+    """Verify synthetic SLA pipeline serializes to disk, passes SHA-256 integrity, and reloads idempotently.
+
+    Contract: Reusable unit-level serialization test for create_text_metadata_pipeline.
+    Demonstrates joblib serialization/deserialization integrity and deterministic inference
+    before and after reload on synthetic test samples.
+    This is an offline unit contract check; it does NOT validate trained run_006 weights,
+    calibration, operational metrics, or production quality.
+    """
+    model_path: Path = synthetic_sla_pipeline["model_path"]
+    sha256_path: Path = synthetic_sla_pipeline["sha256_path"]
+    original_model = synthetic_sla_pipeline["pipeline"]
+
+    assert model_path.exists(), "synthetic_model.joblib missing in tmp_path"
+    assert sha256_path.exists(), "synthetic_model.joblib.sha256 missing in tmp_path"
 
     # Verify integrity hash
     expected_hash = compute_sha256(model_path)
@@ -213,29 +259,48 @@ def test_model_serialization_and_reload_consistency():
         stored_hash = f.read().strip().split()[0]
     assert expected_hash == stored_hash, "Model SHA-256 mismatch with hash file"
 
+    # Verify pipeline structure on original model
+    assert "preprocessor" in original_model.named_steps
+    assert "classifier" in original_model.named_steps
+    assert isinstance(original_model.named_steps["classifier"], LogisticRegression)
+
     # Load serialized pipeline
     loaded_model = joblib.load(model_path)
+    assert "preprocessor" in loaded_model.named_steps
+    assert "classifier" in loaded_model.named_steps
+    assert isinstance(loaded_model.named_steps["classifier"], LogisticRegression)
 
-    # Predict on test samples
+    # Predict on test samples and compare original vs reloaded predictions
     sample_rows = [
         {"message": "Urgent crash on PayWallet app", "product": "PayWallet", "channel": "Email"},
         {"message": "Thank you for the wonderful update", "product": "CloudDrive", "channel": "Chat"},
         {"message": "Device battery drained quickly", "product": "FitBand X", "channel": "Social Media"},
     ]
     X_sample = build_feature_matrix(sample_rows)
-    probs = loaded_model.predict_proba(X_sample)
+    probs_orig = original_model.predict_proba(X_sample)
+    probs_loaded = loaded_model.predict_proba(X_sample)
 
-    assert probs.shape == (3, 2)
+    assert probs_loaded.shape == (3, 2)
+    np.testing.assert_allclose(probs_orig, probs_loaded, atol=1e-12)
+
     # Reload again to verify deterministic idempotence
     reloaded_again = joblib.load(model_path)
     probs_again = reloaded_again.predict_proba(X_sample)
-    np.testing.assert_allclose(probs, probs_again, atol=1e-12)
+    np.testing.assert_allclose(probs_loaded, probs_again, atol=1e-12)
 
 
-def test_model_output_scores_finite_and_bounded():
-    """Verify all model risk scores are finite floats within [0.0, 1.0]."""
-    run_dir = Path("experiments/runs/run_006_sla_risk_feasibility")
-    model_path = run_dir / "model.joblib"
+def test_synthetic_model_output_scores_finite_and_bounded(
+    synthetic_sla_pipeline: Dict[str, Any],
+) -> None:
+    """Verify synthetic SLA pipeline produces finite probabilities in [0.0, 1.0] that normalize to 1.0.
+
+    Contract: Reusable unit-level inference interface test for create_text_metadata_pipeline.
+    Verifies that calling predict_proba on standard and edge-case inputs (empty strings, unseen categories)
+    yields valid probability distributions summing to 1.0 across classes.
+    This is an offline unit contract check; it does NOT validate trained run_006 weights,
+    calibration, operational metrics, or production quality.
+    """
+    model_path: Path = synthetic_sla_pipeline["model_path"]
     loaded_model = joblib.load(model_path)
 
     test_samples = [
@@ -247,12 +312,13 @@ def test_model_output_scores_finite_and_bounded():
     X_test = build_feature_matrix(test_samples)
     probs = loaded_model.predict_proba(X_test)
 
+    assert probs.shape == (len(test_samples), 2)
     for i in range(len(test_samples)):
         p0, p1 = probs[i, 0], probs[i, 1]
-        assert np.isfinite(p0) and np.isfinite(p1)
-        assert 0.0 <= p0 <= 1.0
-        assert 0.0 <= p1 <= 1.0
-        assert pytest.approx(p0 + p1, abs=1e-7) == 1.0
+        assert np.isfinite(p0) and np.isfinite(p1), f"Probabilities at index {i} must be finite: ({p0}, {p1})"
+        assert 0.0 <= p0 <= 1.0, f"Class 0 probability {p0} at index {i} out of bounds [0.0, 1.0]"
+        assert 0.0 <= p1 <= 1.0, f"Class 1 probability {p1} at index {i} out of bounds [0.0, 1.0]"
+        assert pytest.approx(p0 + p1, abs=1e-7) == 1.0, f"Probabilities at index {i} do not sum to 1.0: {p0 + p1}"
 
 
 def test_threshold_selection_monotonicity():

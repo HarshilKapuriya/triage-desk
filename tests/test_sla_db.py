@@ -111,21 +111,36 @@ def test_ticket_lifecycle_db_primitives():
     tenant_id = _create_test_tenant("Lifecycle Tenant")
 
     with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
-        # Create a test ticket
-        ticket = ticket_repo.create_or_get_ticket(
+        # Create a test ticket using supported arguments
+        ticket, _ = ticket_repo.create_or_get_ticket(
             conn=conn,
             tenant_id=tenant_id,
             subject="Billing issue",
             body="Incorrect fee charged",
             customer_email="customer@example.com",
-            category="billing",
-            priority="urgent",
         )
+        t_created = datetime(2026, 11, 8, 10, 0, 0, tzinfo=UTC)
+        # Test fixture state setup: set category, priority, and deterministic created_at
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE tickets
+                SET category = %s, priority = %s, created_at = %s
+                WHERE tenant_id = %s AND id = %s;
+                """,
+                ("billing", "urgent", t_created, tenant_id, ticket.id),
+            )
         conn.commit()
 
+        # Re-fetch ticket to verify updated fixture state
+        ticket = ticket_repo.get_ticket_by_id(conn, tenant_id, ticket.id)
+        assert ticket is not None
         assert ticket.status == "new"
         assert ticket.first_response_at is None
         assert ticket.resolved_at is None
+        assert ticket.category == "billing"
+        assert ticket.priority == "urgent"
+        assert ticket.created_at == t_created
 
         # 1. Record first response
         t_resp1 = datetime(2026, 11, 8, 10, 30, tzinfo=UTC)

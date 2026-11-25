@@ -1,0 +1,79 @@
+name: Verify Ticket Lifecycle Events (Disposable DB)
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-ticket-events-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-ticket-events:
+    name: Verify Ticket Lifecycle Events (Disposable PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      disposable-postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: triage_events_disposable
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test_user:test_password@127.0.0.1:5433/triage_events_disposable
+      TEST_DATABASE_URL: postgresql://test_user:test_password@127.0.0.1:5433/triage_events_disposable
+      TEST_DISPOSABLE_DATABASE_URL: postgresql://test_user:test_password@127.0.0.1:5433/triage_events_disposable
+      PGHOST: "127.0.0.1"
+      PGPORT: "5433"
+      PGDATABASE: "triage_events_disposable"
+      PGUSER: "test_user"
+      PGHOSTADDR: "127.0.0.1"
+      JWT_SECRET: ci_disposable_secret_minimum_32_chars_long_abcdef123456
+      JWT_EXPIRE_MINUTES: "60"
+
+    steps:
+      - name: Check out pull-request code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install declared dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run target validator unit tests
+        run: |
+          python -m pytest tests/test_target_validator_unit.py -v
+
+      - name: Validate disposable target containment before database operations
+        run: |
+          python -m tests.target_validator "$TEST_DISPOSABLE_DATABASE_URL"
+
+      - name: Apply migrations 001-009 to disposable PostgreSQL service
+        run: |
+          python scripts/migrate.py --database-url "$TEST_DISPOSABLE_DATABASE_URL"
+
+      - name: Run ticket lifecycle unit and database integration tests
+        env:
+          RUN_DISPOSABLE_DB_TESTS: "true"
+        run: |
+          python -m pytest tests/test_ticket_events_unit.py tests/test_ticket_events_db.py -v
+

@@ -22,6 +22,7 @@ from app.repositories.auth import create_tenant_and_admin_user
 import app.repositories.jobs as job_repo
 from app.repositories.jobs import StaleClaimError
 import app.repositories.duplicates as dup_repo
+import app.repositories.ticket_events as ticket_events_repo
 import app.repositories.tickets as ticket_repo
 from app.security import hash_password
 from tests.test_auth_db import resolve_safe_test_db_url, IS_CI
@@ -118,10 +119,43 @@ def test_atomic_enqueue_and_rollback():
     tenant_id = _create_test_tenant("Atomic Enqueue Co")
     ticket_id = _create_test_ticket(tenant_id, "Atomic Enqueue Ticket")
 
-    with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
-        # Case A: Rollback inside transaction drops the enqueued embedding job
+    # autocommit=True guarantees each `with conn.transaction():` is an outermost transaction
+    # (BEGIN/COMMIT/ROLLBACK) rather than a nested savepoint after intermediate reads.
+    with psycopg.connect(LOCAL_TEST_DB_URL, autocommit=True) as conn:
+        # Explicitly enqueue ticket_ingest job and claim it prior to completion attempts
+        with conn.transaction():
+            enqueued_ingest = job_repo.enqueue_job(
+                conn=conn,
+                tenant_id=tenant_id,
+                ticket_id=ticket_id,
+                job_type="ticket_ingest",
+            )
+            assert enqueued_ingest.status == "queued"
+
+        with conn.transaction():
+            ingest_job = job_repo.claim_next_job(
+                conn=conn,
+                worker_id="worker_atomic",
+                allowed_types=("ticket_ingest",),
+                tenant_id=tenant_id,
+            )
+        assert ingest_job is not None
+        assert ingest_job.id == enqueued_ingest.id
+        assert ingest_job.status == "running"
+        assert ingest_job.attempts == 1
+
+        # Case A: Rollback inside transaction drops completion, ticket transition,
+        # lifecycle event, audit entry, and enqueued embedding job atomically
         try:
             with conn.transaction():
+                job_repo.complete_job_with_ticket_transition(
+                    conn=conn,
+                    tenant_id=tenant_id,
+                    job_id=ingest_job.id,
+                    ticket_id=ticket_id,
+                    worker_id="worker_atomic",
+                    generation=ingest_job.attempts,
+                )
                 job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
                 raise RuntimeError("Simulated failure after enqueue")
         except RuntimeError:
@@ -135,29 +169,56 @@ def test_atomic_enqueue_and_rollback():
             count = cur.fetchone()[0]
             assert count == 0, "Rolled back transaction must not commit embedding job"
 
+            cur.execute(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = %s AND action = 'ticket.processed';",
+                (tenant_id,),
+            )
+            assert cur.fetchone()[0] == 0, "Rolled back transaction must not commit audit entry"
+
+        ticket_after_rollback = ticket_repo.get_ticket_by_id(conn, tenant_id, ticket_id)
+        assert ticket_after_rollback is not None
+        assert ticket_after_rollback.status == "new", "Rolled back transaction must keep ticket in 'new' status"
+
+        ingest_after_rollback = job_repo.get_job_by_id(conn, tenant_id, ingest_job.id)
+        assert ingest_after_rollback is not None
+        assert ingest_after_rollback.status == "running"
+        assert ingest_after_rollback.attempts == 1
+        assert ingest_after_rollback.completed_at is None
+
+        events_after_rollback = ticket_events_repo.list_ticket_events(conn, tenant_id, ticket_id)
+        assert [e.event_type for e in events_after_rollback] == ["ticket_created"], (
+            "Rolled back transaction must not commit ticket_processed lifecycle event"
+        )
+
         # Case B: Ingest completion and embedding enqueue commit atomically together
         with conn.transaction():
-            ingest_job = job_repo.claim_next_job(
+            completed = job_repo.complete_job_with_ticket_transition(
                 conn=conn,
-                worker_id="worker_atomic",
-                allowed_types=("ticket_ingest",),
                 tenant_id=tenant_id,
+                job_id=ingest_job.id,
+                ticket_id=ticket_id,
+                worker_id="worker_atomic",
+                generation=ingest_job.attempts,
             )
-            if ingest_job:
-                job_repo.complete_job_with_ticket_transition(
-                    conn=conn,
-                    tenant_id=tenant_id,
-                    job_id=ingest_job.id,
-                    ticket_id=ticket_id,
-                    worker_id="worker_atomic",
-                    generation=ingest_job.attempts,
-                )
-            job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            assert completed is True
+            emb_job = job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            assert emb_job is not None
+            assert emb_job.type == "ticket_embedding"
+            assert emb_job.status == "queued"
 
-        # Verify ticket is open AND embedding job exists
+        # Verify ticket is open, ingest job is completed, lifecycle event recorded, and embedding job exists
         ticket = ticket_repo.get_ticket_by_id(conn, tenant_id, ticket_id)
         assert ticket is not None
         assert ticket.status == "open"
+
+        ingest_after_commit = job_repo.get_job_by_id(conn, tenant_id, ingest_job.id)
+        assert ingest_after_commit is not None
+        assert ingest_after_commit.status == "completed"
+        assert ingest_after_commit.completed_at is not None
+
+        events_after_commit = ticket_events_repo.list_ticket_events(conn, tenant_id, ticket_id)
+        assert len(events_after_commit) == 2
+        assert {e.event_type for e in events_after_commit} == {"ticket_created", "ticket_processed"}
 
         with conn.cursor() as cur:
             cur.execute(
@@ -166,6 +227,17 @@ def test_atomic_enqueue_and_rollback():
             )
             assert cur.fetchone()[0] == 1
 
+            cur.execute(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = %s AND action = 'ticket.processed';",
+                (tenant_id,),
+            )
+            assert cur.fetchone()[0] == 1
+
+        # Verify idempotent enqueue replay does not add duplicate embedding job
+        with conn.transaction():
+            duplicate_emb = job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            assert duplicate_emb is None
+
 
 def test_embedding_persistence():
     """Verify complete_embedding_job atomically completes job and persists embedding vector."""
@@ -173,9 +245,10 @@ def test_embedding_persistence():
     tenant_id = _create_test_tenant("Persistence Co")
     ticket_id = _create_test_ticket(tenant_id, "Persistence Ticket")
 
-    with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
+    with psycopg.connect(LOCAL_TEST_DB_URL, autocommit=True) as conn:
         with conn.transaction():
-            job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            enqueued = job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            assert enqueued is not None
 
         # Claim the embedding job
         with conn.transaction():
@@ -185,8 +258,9 @@ def test_embedding_persistence():
                 allowed_types=("ticket_embedding",),
                 tenant_id=tenant_id,
             )
-            assert job is not None
-            assert job.type == "ticket_embedding"
+        assert job is not None
+        assert job.type == "ticket_embedding"
+        assert job.attempts == 1
 
         dummy_vector = [0.05 * (i % 10) for i in range(384)]
         with conn.transaction():
@@ -205,16 +279,52 @@ def test_embedding_persistence():
 
         # Verify job is completed
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT status, completed_at FROM jobs WHERE id = %s;", (job.id,))
+            cur.execute(
+                "SELECT status, completed_at FROM jobs WHERE tenant_id = %s AND id = %s;",
+                (tenant_id, job.id),
+            )
             row = cur.fetchone()
+            assert row is not None
             assert row["status"] == "completed"
             assert row["completed_at"] is not None
 
         # Verify embedding row persisted via duplicates repo
-        embeddings = dup_repo.list_ticket_embeddings(conn, tenant_id, ticket_id)
-        assert len(embeddings) == 1
-        assert embeddings[0].model_name == "all-MiniLM-L6-v2"
-        assert embeddings[0].model_version == "rev_db_persist"
+        stored_emb = dup_repo.get_ticket_embedding(
+            conn=conn,
+            tenant_id=tenant_id,
+            ticket_id=ticket_id,
+            model_name="all-MiniLM-L6-v2",
+            model_version="rev_db_persist",
+        )
+        assert stored_emb is not None
+        assert stored_emb.tenant_id == tenant_id
+        assert stored_emb.ticket_id == ticket_id
+        assert stored_emb.model_name == "all-MiniLM-L6-v2"
+        assert stored_emb.model_version == "rev_db_persist"
+        assert len(stored_emb.embedding) == 384
+        assert stored_emb.embedding == pytest.approx(dummy_vector, abs=1e-5)
+
+        # Verify cross-tenant isolation and model/version specificity
+        assert (
+            dup_repo.get_ticket_embedding(
+                conn=conn,
+                tenant_id=uuid.uuid4(),
+                ticket_id=ticket_id,
+                model_name="all-MiniLM-L6-v2",
+                model_version="rev_db_persist",
+            )
+            is None
+        )
+        assert (
+            dup_repo.get_ticket_embedding(
+                conn=conn,
+                tenant_id=tenant_id,
+                ticket_id=ticket_id,
+                model_name="all-MiniLM-L6-v2",
+                model_version="rev_other",
+            )
+            is None
+        )
 
 
 def test_independent_retry_and_terminal_failure():
@@ -404,10 +514,20 @@ def test_browser_list_and_status_non_interference():
     """Verify ticket list query returns exactly one row per ticket and derives status only from ingest job."""
     assert LOCAL_TEST_DB_URL is not None
     tenant_id = _create_test_tenant("Browser Query Co")
+    other_tenant_id = _create_test_tenant("Browser Isolation Co")
     ticket_id = _create_test_ticket(tenant_id, "Browser Non-Interference Ticket")
 
-    with psycopg.connect(LOCAL_TEST_DB_URL) as conn:
-        # Ingest job completed
+    with psycopg.connect(LOCAL_TEST_DB_URL, autocommit=True) as conn:
+        # Explicitly enqueue, claim, and complete ticket_ingest job
+        with conn.transaction():
+            enqueued_ingest = job_repo.enqueue_job(
+                conn=conn,
+                tenant_id=tenant_id,
+                ticket_id=ticket_id,
+                job_type="ticket_ingest",
+            )
+            assert enqueued_ingest.status == "queued"
+
         with conn.transaction():
             ingest_job = job_repo.claim_next_job(
                 conn=conn,
@@ -415,23 +535,41 @@ def test_browser_list_and_status_non_interference():
                 allowed_types=("ticket_ingest",),
                 tenant_id=tenant_id,
             )
-            if ingest_job:
-                job_repo.complete_job_with_ticket_transition(
-                    conn=conn,
-                    tenant_id=tenant_id,
-                    job_id=ingest_job.id,
-                    ticket_id=ticket_id,
-                    worker_id="worker_browser",
-                    generation=ingest_job.attempts,
-                )
+        assert ingest_job is not None
+        assert ingest_job.id == enqueued_ingest.id
+        assert ingest_job.attempts == 1
+
+        with conn.transaction():
+            completed = job_repo.complete_job_with_ticket_transition(
+                conn=conn,
+                tenant_id=tenant_id,
+                job_id=ingest_job.id,
+                ticket_id=ticket_id,
+                worker_id="worker_browser",
+                generation=ingest_job.attempts,
+            )
+            assert completed is True
 
         # Enqueue embedding job in queued status
         with conn.transaction():
-            job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            emb_job = job_repo.enqueue_embedding_job_if_not_exists(conn, tenant_id, ticket_id)
+            assert emb_job is not None
+            assert emb_job.status == "queued"
 
-        # Query ticket list
-        items = ticket_repo.list_tickets_for_tenant(conn, tenant_id)
+        # Query ticket list via supported browser repository listing interface
+        items = ticket_repo.list_tickets_with_prediction(conn, tenant_id, limit=20, offset=0)
         matching = [t for t in items if t.id == ticket_id]
 
+        assert ticket_repo.count_tickets(conn, tenant_id) == 1
         assert len(matching) == 1, "Must return exactly one row without duplication from embedding job"
+        assert matching[0].tenant_id == tenant_id
+        assert matching[0].status == "open", "Ticket status must reflect completed ingest transition"
         assert matching[0].job_status == "completed", "Job status must reflect ticket_ingest job, not ticket_embedding"
+        assert matching[0].job_attempts == 1
+
+        # Pagination offset beyond available items returns empty list
+        assert ticket_repo.list_tickets_with_prediction(conn, tenant_id, limit=20, offset=1) == []
+
+        # Cross-tenant isolation check on ticket listing
+        other_items = ticket_repo.list_tickets_with_prediction(conn, other_tenant_id, limit=20, offset=0)
+        assert all(t.id != ticket_id for t in other_items)

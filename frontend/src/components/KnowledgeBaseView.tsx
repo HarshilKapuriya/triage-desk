@@ -249,7 +249,7 @@ export const KnowledgeBaseView = ({ onBack }: KnowledgeBaseViewProps) => {
             style={{
               backgroundColor: 'var(--bg-subtle)',
               border: '1px solid var(--border-color)',
-              borderRadius: '4px',
+              borderRadius: '12px',
               padding: '32px 16px',
               textAlign: 'center',
             }}

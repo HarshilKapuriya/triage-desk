@@ -12,6 +12,7 @@ import {
   TicketSLAResponse,
   LifecycleActionResponse,
   DashboardResponse,
+  TicketEventsResponse,
 } from './types';
 
 class ApiClient {
@@ -173,6 +174,10 @@ class ApiClient {
 
   async getTicketSla(ticketId: string): Promise<TicketSLAResponse> {
     return this.request<TicketSLAResponse>(`/browser-api/tickets/${ticketId}/sla`);
+  }
+
+  async getTicketEvents(ticketId: string, signal?: AbortSignal): Promise<TicketEventsResponse> {
+    return this.request<TicketEventsResponse>(`/browser-api/tickets/${ticketId}/events`, { signal });
   }
 
   async recordFirstResponse(ticketId: string): Promise<LifecycleActionResponse> {

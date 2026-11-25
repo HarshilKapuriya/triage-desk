@@ -243,3 +243,48 @@ export interface DashboardResponse {
   urgency_notice: string;
   message?: string | null;
 }
+
+export interface IntakePolicySummary {
+  is_configured: boolean;
+  policy_priority: string | null;
+  first_response_minutes: number | null;
+  resolution_minutes: number | null;
+}
+
+export interface TicketEventDetails {
+  intake_policy: IntakePolicySummary | null;
+  priority: string | null;
+  category: string | null;
+  from_status: string | null;
+  to_status: string | null;
+  predicted_category: string | null;
+  elapsed_calendar_seconds: number | null;
+}
+
+export interface TicketEventItem {
+  id: string;
+  event_type:
+    | 'ticket_created'
+    | 'ticket_processed'
+    | 'first_response_recorded'
+    | 'ticket_resolved'
+    | 'ticket_closed'
+    | string;
+  label: string;
+  schema_version: number;
+  schema_supported: boolean;
+  payload_valid: boolean;
+  occurred_at: string;
+  recorded_at: string;
+  actor_type: 'system' | 'agent' | 'worker' | 'customer' | string;
+  details: TicketEventDetails | null;
+}
+
+export interface TicketEventsResponse {
+  ticket_id: string;
+  schema_available: boolean;
+  ordering: string;
+  ordering_notice: string;
+  events: TicketEventItem[];
+  message?: string | null;
+}

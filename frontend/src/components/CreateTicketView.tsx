@@ -74,17 +74,17 @@ export const CreateTicketView = ({ onSuccess, onCancel }: CreateTicketViewProps)
 
         <div
           style={{
-            backgroundColor: 'var(--warning-bg)',
-            border: '1px solid var(--warning-border)',
-            color: 'var(--warning-text)',
+            backgroundColor: 'var(--bg-subtle)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-muted)',
             padding: '12px 16px',
-            borderRadius: '4px',
+            borderRadius: '12px',
             fontSize: '13px',
             marginBottom: '20px',
             lineHeight: 1.4,
           }}
         >
-          <strong>Domain Notice:</strong> This platform is powered by the CFPB-trained financial product classifier (run_004). It does not detect out-of-domain inquiries (e.g. IT support, generic bug reports).
+          <strong style={{ color: 'var(--text-main)' }}>Domain Notice:</strong> This platform is powered by the CFPB-trained financial product classifier (run_004). It does not detect out-of-domain inquiries (e.g. IT support, generic bug reports).
         </div>
 
         {error && (
