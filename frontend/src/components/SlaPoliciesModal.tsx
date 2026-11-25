@@ -149,13 +149,13 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
             <div>
               <h2
                 id="sla-modal-title"
-                style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}
+                style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}
               >
                 Tenant SLA Policies
               </h2>
               <p
                 id="sla-modal-desc"
-                style={{ fontSize: '13px', color: '#475569', margin: '4px 0 0' }}
+                style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0' }}
               >
                 Deterministic response and resolution targets scoped to your tenant.
               </p>
@@ -168,10 +168,10 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                 border: 'none',
                 fontSize: '24px',
                 cursor: 'pointer',
-                color: '#64748b',
+                color: 'var(--text-muted)',
                 padding: '4px 8px',
                 lineHeight: 1,
-                borderRadius: '4px',
+                borderRadius: '9999px',
               }}
               aria-label="Close modal"
               title="Close modal (Esc)"
@@ -213,30 +213,30 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
 
             {/* Existing Policies List */}
             <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '10px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '10px' }}>
                 Configured Policies ({policies.length})
               </h3>
 
               {loading ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                   Loading policies...
                 </div>
               ) : policies.length === 0 ? (
                 <div
                   style={{
-                    backgroundColor: '#f8fafc',
+                    backgroundColor: 'var(--bg-subtle)',
                     padding: '20px',
-                    borderRadius: '6px',
+                    borderRadius: '12px',
                     textAlign: 'center',
                     fontSize: '13px',
-                    color: '#475569',
-                    border: '1px solid #e2e8f0',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
                   }}
                 >
                   No SLA policies configured for this tenant. Add a policy below.
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
                   <table className="sla-modal-table">
                     <thead>
                       <tr>
@@ -254,12 +254,12 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                             <td>
                               <span
                                 style={{
-                                  fontWeight: 600,
+                                  fontWeight: 500,
                                   textTransform: 'uppercase',
                                   fontSize: '11px',
-                                  letterSpacing: '0.5px',
-                                  padding: '3px 8px',
-                                  borderRadius: '4px',
+                                  letterSpacing: '0.04em',
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
                                   display: 'inline-block',
                                   ...badgeStyle,
                                 }}
@@ -267,28 +267,28 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                                 {p.priority} {p.priority === 'default' ? '(Tenant Default)' : ''}
                               </span>
                             </td>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: '#1e293b' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-main)' }}>
                               {formatMinutes(p.first_response_minutes)}
                             </td>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: '#1e293b' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-main)' }}>
                               {formatMinutes(p.resolution_minutes)}
                             </td>
                             <td style={{ textAlign: 'right' }}>
                               {confirmDeletePriority === p.priority ? (
                                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#b91c1c' }}>Delete?</span>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--danger)' }}>Delete?</span>
                                   <button
                                     type="button"
                                     disabled={deletingPriority === p.priority}
                                     onClick={() => handleDelete(p.priority)}
                                     style={{
-                                      padding: '4px 10px',
+                                      padding: '4px 12px',
                                       fontSize: '12px',
-                                      fontWeight: 600,
-                                      backgroundColor: '#dc2626',
+                                      fontWeight: 500,
+                                      backgroundColor: 'var(--danger)',
                                       color: '#ffffff',
                                       border: 'none',
-                                      borderRadius: '4px',
+                                      borderRadius: '9999px',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -298,12 +298,12 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                                     type="button"
                                     onClick={() => setConfirmDeletePriority(null)}
                                     style={{
-                                      padding: '4px 8px',
+                                      padding: '4px 10px',
                                       fontSize: '12px',
                                       background: '#ffffff',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '4px',
-                                      color: '#334155',
+                                      border: '1px solid var(--border-subtle)',
+                                      borderRadius: '9999px',
+                                      color: 'var(--text-main)',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -316,13 +316,13 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                                   disabled={!schemaAvailable}
                                   onClick={() => setConfirmDeletePriority(p.priority)}
                                   style={{
-                                    padding: '4px 10px',
+                                    padding: '4px 12px',
                                     fontSize: '12px',
                                     fontWeight: 500,
                                     background: '#ffffff',
-                                    border: '1px solid #fca5a5',
-                                    borderRadius: '4px',
-                                    color: '#b91c1c',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '9999px',
+                                    color: 'var(--danger)',
                                     cursor: schemaAvailable ? 'pointer' : 'not-allowed',
                                   }}
                                 >
@@ -346,7 +346,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                 paddingTop: '18px',
               }}
             >
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px' }}>
                 Add or Update Policy
               </h3>
               <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -354,7 +354,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                   <div>
                     <label
                       htmlFor="sla-priority"
-                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                     >
                       Priority Key
                     </label>
@@ -375,7 +375,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                   <div>
                     <label
                       htmlFor="sla-fr-target"
-                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                     >
                       First Response (mins)
                     </label>
@@ -388,7 +388,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                       onChange={(e) => setFirstResponseMinutes(parseInt(e.target.value, 10) || 0)}
                       className="sla-modal-input"
                     />
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#475569', marginTop: '4px', display: 'block' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                       ≈ {formatMinutes(firstResponseMinutes)}
                     </span>
                   </div>
@@ -396,7 +396,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                   <div>
                     <label
                       htmlFor="sla-res-target"
-                      style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}
+                      style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                     >
                       Resolution (mins)
                     </label>
@@ -409,7 +409,7 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                       onChange={(e) => setResolutionMinutes(parseInt(e.target.value, 10) || 0)}
                       className="sla-modal-input"
                     />
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#475569', marginTop: '4px', display: 'block' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                       ≈ {formatMinutes(resolutionMinutes)}
                     </span>
                   </div>
@@ -417,16 +417,16 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
 
                 <div
                   style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    padding: '10px 14px',
+                    backgroundColor: 'var(--bg-subtle)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
                     fontSize: '12px',
-                    color: '#334155',
+                    color: 'var(--text-muted)',
                     lineHeight: 1.5,
                   }}
                 >
-                  <strong style={{ color: '#0f172a' }}>Notice:</strong> Policy targets are evaluated deterministically against elapsed calendar time
+                  <strong style={{ color: 'var(--text-main)' }}>Notice:</strong> Policy targets are evaluated deterministically against elapsed calendar time
                   using UTC timestamps. Saving or deleting a policy takes immediate effect on all tickets in this tenant.
                 </div>
 
@@ -435,13 +435,13 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                     type="button"
                     onClick={onClose}
                     style={{
-                      padding: '8px 16px',
+                      padding: '8px 18px',
                       fontSize: '13px',
                       fontWeight: 500,
-                      backgroundColor: '#ffffff',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '4px',
+                      backgroundColor: 'var(--bg-surface)',
+                      color: 'var(--text-main)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '9999px',
                       cursor: 'pointer',
                     }}
                   >
@@ -451,14 +451,15 @@ export const SlaPoliciesModal = ({ onClose, onPolicyChanged }: SlaPoliciesModalP
                     type="submit"
                     disabled={saving || !schemaAvailable}
                     style={{
-                      padding: '8px 18px',
+                      padding: '8px 20px',
                       fontSize: '13px',
-                      fontWeight: 600,
-                      backgroundColor: saving || !schemaAvailable ? '#94a3b8' : '#1e3a8a',
+                      fontWeight: 500,
+                      backgroundColor: saving || !schemaAvailable ? '#86868B' : 'var(--primary)',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '4px',
+                      borderRadius: '9999px',
                       cursor: saving || !schemaAvailable ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     {saving ? 'Saving...' : 'Save Policy'}

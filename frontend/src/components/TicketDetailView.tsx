@@ -625,7 +625,7 @@ export const TicketDetailView = ({
               style={{
                 backgroundColor: 'var(--bg-subtle)',
                 border: '1px solid var(--border-color)',
-                borderRadius: '4px',
+                borderRadius: '12px',
                 padding: '16px',
                 fontSize: '13px',
                 lineHeight: 1.6,
@@ -670,7 +670,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -688,7 +688,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -767,13 +767,13 @@ export const TicketDetailView = ({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
+                                    padding: '3px 10px',
+                                    borderRadius: 'var(--radius-full)',
                                     fontSize: '11px',
-                                    fontWeight: 600,
-                                    backgroundColor: '#e6f4ea',
-                                    color: '#137333',
-                                    border: '1px solid #ceead6',
+                                    fontWeight: 500,
+                                    backgroundColor: 'var(--success-bg)',
+                                    color: 'var(--success)',
+                                    border: '1px solid var(--success-border)',
                                   }}
                                   title={item.reviewed_at ? `Confirmed on ${new Date(item.reviewed_at).toISOString().replace('T', ' ').slice(0, 19)} UTC` : 'Confirmed duplicate'}
                                 >
@@ -804,8 +804,8 @@ export const TicketDetailView = ({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
+                                    padding: '3px 10px',
+                                    borderRadius: 'var(--radius-full)',
                                     fontSize: '11px',
                                     fontWeight: 500,
                                     backgroundColor: 'var(--bg-subtle)',
@@ -916,7 +916,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -934,7 +934,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -952,7 +952,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -968,14 +968,14 @@ export const TicketDetailView = ({
             ) : knowledgeData?.status === 'articles_failed' ? (
               <div
                 style={{
-                  backgroundColor: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '4px',
+                  backgroundColor: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
               >
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#b91c1c', marginBottom: '4px' }}>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--danger)', marginBottom: '4px' }}>
                   Knowledge Embedding Failed
                 </p>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
@@ -988,7 +988,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -1006,7 +1006,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -1027,7 +1027,7 @@ export const TicketDetailView = ({
                       style={{
                         backgroundColor: 'var(--bg-subtle)',
                         border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
+                        borderRadius: '12px',
                         padding: '14px',
                       }}
                     >
@@ -1075,7 +1075,7 @@ export const TicketDetailView = ({
                           wordBreak: 'break-word',
                           backgroundColor: 'var(--bg-card)',
                           padding: '10px',
-                          borderRadius: '4px',
+                          borderRadius: '8px',
                           border: '1px solid var(--border-color)',
                         }}
                       >
@@ -1174,7 +1174,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -1192,7 +1192,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center',
                 }}
@@ -1207,22 +1207,24 @@ export const TicketDetailView = ({
               </div>
             ) : (
               <ol
+                className="lifecycle-timeline-list"
                 style={{
                   listStyle: 'none',
                   padding: 0,
                   margin: 0,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: '14px',
                 }}
               >
                 {eventsData.events.map((ev) => (
                   <li
                     key={ev.id}
+                    className="lifecycle-timeline-item"
                     style={{
                       border: '1px solid var(--border-color)',
-                      borderRadius: '4px',
-                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
                       backgroundColor: 'var(--bg-subtle)',
                     }}
                   >
@@ -1451,7 +1453,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '12px 14px',
                 }}
               >
@@ -1468,7 +1470,7 @@ export const TicketDetailView = ({
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
+                  borderRadius: '12px',
                   padding: '12px 14px',
                 }}
               >
@@ -1517,7 +1519,7 @@ export const TicketDetailView = ({
                             slaData.first_response.is_breached
                               ? 'var(--danger)'
                               : slaData.first_response.is_completed
-                              ? '#137333'
+                              ? 'var(--success)'
                               : 'var(--primary)',
                         }}
                       >
@@ -1569,7 +1571,7 @@ export const TicketDetailView = ({
                             slaData.resolution.is_breached
                               ? 'var(--danger)'
                               : slaData.resolution.is_completed
-                              ? '#137333'
+                              ? 'var(--success)'
                               : 'var(--primary)',
                         }}
                       >
@@ -1771,7 +1773,7 @@ export const TicketDetailView = ({
                         maxHeight: '220px',
                         overflowY: 'auto',
                         border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
+                        borderRadius: '8px',
                       }}
                     >
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
@@ -1782,7 +1784,7 @@ export const TicketDetailView = ({
                               style={{
                                 borderBottom: '1px solid var(--border-color)',
                                 backgroundColor:
-                                  label === prediction.predicted_label ? '#f5f3ff' : 'transparent',
+                                  label === prediction.predicted_label ? 'rgba(0, 113, 227, 0.08)' : 'transparent',
                                 fontWeight: label === prediction.predicted_label ? 600 : 'normal',
                               }}
                             >
